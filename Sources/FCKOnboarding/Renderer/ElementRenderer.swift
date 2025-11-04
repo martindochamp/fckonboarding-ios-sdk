@@ -62,7 +62,7 @@ struct TextElementView: View {
     var body: some View {
         Text(element.content)
             .font(.system(size: element.fontSize, weight: element.fontWeight.swiftUIWeight))
-            .foregroundColor(Color(hex: element.color))
+            .foregroundColor(Color(hex: element.color) ?? .primary)
             .multilineTextAlignment(element.alignment.swiftUIAlignment)
             .frame(maxWidth: .infinity, alignment: element.alignment.frameAlignment)
             .applySpacing(padding: element.padding, margin: element.margin)
@@ -143,14 +143,14 @@ struct ButtonElementView: View {
         Button(action: handleAction) {
             Text(element.text)
                 .font(.headline)
-                .foregroundColor(Color(hex: element.textColor))
+                .foregroundColor(Color(hex: element.textColor) ?? .primary)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(element.style == .filled ? Color(hex: element.backgroundColor) : Color.clear)
+                .background(element.style == .filled ? (Color(hex: element.backgroundColor) ?? .clear) : Color.clear)
                 .overlay(
                     element.style == .outline ?
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: element.backgroundColor), lineWidth: 2)
+                        .stroke(Color(hex: element.backgroundColor) ?? .black, lineWidth: 2)
                     : nil
                 )
                 .cornerRadius(12)
