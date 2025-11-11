@@ -3,6 +3,7 @@ import Foundation
 /// Main SDK class for FCKOnboarding
 public class FCKOnboarding {
     public static let shared = FCKOnboarding()
+    public static let version = "1.0.0"
 
     private var apiClient: FCKAPIClient?
     private let cache = FlowCache()
@@ -22,12 +23,12 @@ public class FCKOnboarding {
     /// Configure the SDK with your API key
     public static func configure(
         apiKey: String,
-        environment: FCKAPIClient.Environment = .production,
+        debugMode: Bool = false,
         cachePolicy: CachePolicy = .cacheFirst
     ) {
         shared.apiClient = FCKAPIClient(
             apiKey: apiKey,
-            environment: environment
+            debugMode: debugMode
         )
         shared.cachePolicy = cachePolicy
     }
@@ -47,8 +48,8 @@ public class FCKOnboarding {
             throw FCKError.notConfigured
         }
 
-        let response = try await apiClient.fetchFlowForPlacement(
-            placement,
+        let response = try await apiClient.fetchFlow(
+            placement: placement,
             userId: customUserId,
             userProperties: userProperties
         )
@@ -75,16 +76,6 @@ public class FCKOnboarding {
         return flowConfig
     }
 
-    /// Check if user has completed onboarding (from backend)
-    public func checkCompletion() async throws -> Bool {
-        guard let apiClient = apiClient else {
-            throw FCKError.notConfigured
-        }
-
-        let response = try await apiClient.checkCompletion(userId: customUserId)
-        return response.completed
-    }
-
     /// Mark onboarding as completed (syncs with backend)
     public func markCompleted() async {
         guard let apiClient = apiClient else {
@@ -92,12 +83,9 @@ public class FCKOnboarding {
         }
 
         do {
-            try await apiClient.recordCompletion(
+            try await apiClient.markCompleted(
                 userId: customUserId,
                 flowId: currentPlacementResponse?.flowId,
-                placementId: currentPlacementResponse?.placementId,
-                campaignId: currentPlacementResponse?.campaignId,
-                variantId: currentPlacementResponse?.variantId,
                 responses: getUserResponses()
             )
 
@@ -136,8 +124,8 @@ public class FCKOnboarding {
     public func trackEvent(
         name: String,
         flowId: String? = nil,
-        screenId: String? = nil,
-        properties: [String: Any]? = nil
+        screenIndex: Int? = nil,
+        metadata: [String: Any]? = nil
     ) async throws {
         guard let apiClient = apiClient else {
             throw FCKError.notConfigured
@@ -145,10 +133,11 @@ public class FCKOnboarding {
 
         let finalFlowId = flowId ?? currentPlacementResponse?.flowId
         try await apiClient.trackEvent(
-            eventName: name,
+            eventType: name,
+            userId: customUserId,
             flowId: finalFlowId,
-            screenId: screenId,
-            properties: properties
+            screenIndex: screenIndex,
+            metadata: metadata
         )
     }
 }
