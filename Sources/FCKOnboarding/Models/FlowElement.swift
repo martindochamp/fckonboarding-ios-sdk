@@ -7,7 +7,7 @@ public protocol FlowElementProtocol: Codable, Equatable, Identifiable {
 }
 
 /// Type-erased wrapper for flow elements - matches builder output
-public enum FlowElement: Codable, Identifiable {
+public enum FlowElement: Codable, Equatable, Identifiable {
     case stack(StackElement)
     case text(TextElement)
     case image(ImageElement)
