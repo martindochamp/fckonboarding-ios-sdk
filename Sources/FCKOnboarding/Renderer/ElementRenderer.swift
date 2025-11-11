@@ -43,13 +43,13 @@ struct StackElementView: View {
         let isVertical = element.axis.lowercased() == "vertical"
         let stack = Group {
             if isVertical {
-                VStack(spacing: element.spacing ?? 0) {
+                VStack(alignment: horizontalAlignment, spacing: element.spacing ?? 0) {
                     ForEach(element.children) { child in
                         ElementRenderer.render(element: child, onNavigate: onNavigate)
                     }
                 }
             } else {
-                HStack(spacing: element.spacing ?? 0) {
+                HStack(alignment: verticalAlignment, spacing: element.spacing ?? 0) {
                     ForEach(element.children) { child in
                         ElementRenderer.render(element: child, onNavigate: onNavigate)
                     }
@@ -63,6 +63,26 @@ struct StackElementView: View {
             .background(element.backgroundColor.flatMap { Color(hex: $0) })
             .applyDimensions(width: element.width, height: element.height)
             .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
+    }
+
+    // Map alignItems to SwiftUI alignment for VStack (horizontal alignment of children)
+    private var horizontalAlignment: HorizontalAlignment {
+        switch element.alignItems?.lowercased() {
+        case "center": return .center
+        case "flex-end", "end", "right": return .trailing
+        case "flex-start", "start", "left": return .leading
+        default: return .center
+        }
+    }
+
+    // Map alignItems to SwiftUI alignment for HStack (vertical alignment of children)
+    private var verticalAlignment: VerticalAlignment {
+        switch element.alignItems?.lowercased() {
+        case "center": return .center
+        case "flex-end", "end", "bottom": return .bottom
+        case "flex-start", "start", "top": return .top
+        default: return .center
+        }
     }
 }
 
