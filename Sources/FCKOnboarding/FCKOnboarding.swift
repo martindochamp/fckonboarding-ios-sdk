@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Main SDK class for FCKOnboarding
 public class FCKOnboarding {
@@ -19,6 +20,27 @@ public class FCKOnboarding {
     private var cachePolicy: CachePolicy = .cacheFirst
 
     private init() {}
+
+    /// Get a persistent device ID (creates one if it doesn't exist)
+    private var deviceId: String {
+        let key = "FCKOnboarding.DeviceId"
+
+        // Try to get stored device ID
+        if let storedId = UserDefaults.standard.string(forKey: key) {
+            return storedId
+        }
+
+        // Try to get vendor identifier
+        if let vendorId = UIDevice.current.identifierForVendor?.uuidString {
+            UserDefaults.standard.set(vendorId, forKey: key)
+            return vendorId
+        }
+
+        // Fallback: generate a random UUID and persist it
+        let newId = UUID().uuidString
+        UserDefaults.standard.set(newId, forKey: key)
+        return newId
+    }
 
     /// Configure the SDK with your API key
     public static func configure(
@@ -51,6 +73,7 @@ public class FCKOnboarding {
         let response = try await apiClient.fetchFlow(
             placement: placement,
             userId: customUserId,
+            deviceId: deviceId,
             userProperties: userProperties
         )
 
@@ -85,6 +108,7 @@ public class FCKOnboarding {
         do {
             try await apiClient.markCompleted(
                 userId: customUserId,
+                deviceId: deviceId,
                 flowId: currentPlacementResponse?.flowId,
                 responses: getUserResponses()
             )
@@ -135,6 +159,7 @@ public class FCKOnboarding {
         try await apiClient.trackEvent(
             eventType: name,
             userId: customUserId,
+            sessionId: deviceId, // Use deviceId as sessionId for consistency
             flowId: finalFlowId,
             screenIndex: screenIndex,
             metadata: metadata

@@ -64,8 +64,32 @@ public class FCKAPIClient {
         deviceId: String? = nil,
         userProperties: [String: Any]? = nil
     ) async throws -> PlacementFlowResponse {
-        let urlString = "\(environment.baseURL)/api/sdk/placement/\(placement)"
-        guard let url = URL(string: urlString) else {
+        // Build URL with query parameters
+        var components = URLComponents(string: "\(environment.baseURL)/api/sdk/placement/\(placement)")
+        guard components != nil else {
+            throw APIError.invalidURL
+        }
+
+        var queryItems: [URLQueryItem] = []
+
+        // Add userId or deviceId as query parameters (at least one is required)
+        if let userId = userId {
+            queryItems.append(URLQueryItem(name: "userId", value: userId))
+        }
+        if let deviceId = deviceId {
+            queryItems.append(URLQueryItem(name: "deviceId", value: deviceId))
+        }
+
+        // Add user properties as JSON in query param if provided
+        if let properties = userProperties,
+           let jsonData = try? JSONSerialization.data(withJSONObject: properties),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            queryItems.append(URLQueryItem(name: "userProperties", value: jsonString))
+        }
+
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
+
+        guard let url = components?.url else {
             throw APIError.invalidURL
         }
 
@@ -75,29 +99,15 @@ public class FCKAPIClient {
         // Add headers
         var headers = environment.headers
         headers["X-API-Key"] = apiKey
-
-        if let userId = userId {
-            headers["X-User-Id"] = userId
-        }
-        if let deviceId = deviceId ?? UIDevice.current.identifierForVendor?.uuidString {
-            headers["X-Device-Id"] = deviceId
-        }
-
-        // Add user properties
-        if let properties = userProperties {
-            if let jsonData = try? JSONSerialization.data(withJSONObject: properties),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                headers["X-User-Properties"] = jsonString.data(using: .utf8)?.base64EncodedString()
-            }
-        }
-
         request.allHTTPHeaderFields = headers
 
         if debugMode {
             print("🌐 FCKOnboarding API Request:")
-            print("  - URL: \(urlString)")
+            print("  - URL: \(url.absoluteString)")
             print("  - Environment: \(environment.displayName)")
             print("  - Placement: \(placement)")
+            print("  - UserId: \(userId ?? "nil")")
+            print("  - DeviceId: \(deviceId ?? "nil")")
             print("  - Headers: \(headers)")
         }
 
@@ -180,12 +190,12 @@ public class FCKAPIClient {
         headers["Content-Type"] = "application/json"
         request.allHTTPHeaderFields = headers
 
-        // Build request body
+        // Build request body - ensure at least userId or deviceId is present
         var body: [String: Any] = [:]
         if let userId = userId {
             body["userId"] = userId
         }
-        if let deviceId = deviceId ?? UIDevice.current.identifierForVendor?.uuidString {
+        if let deviceId = deviceId {
             body["deviceId"] = deviceId
         }
         if let flowId = flowId {
@@ -193,6 +203,11 @@ public class FCKAPIClient {
         }
         if let responses = responses {
             body["responses"] = responses
+        }
+
+        // Validate that we have at least userId or deviceId
+        if body["userId"] == nil && body["deviceId"] == nil {
+            throw APIError.serverError(400, "Missing required parameter: userId or deviceId")
         }
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
