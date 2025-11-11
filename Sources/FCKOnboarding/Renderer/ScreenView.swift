@@ -82,10 +82,38 @@ struct ScreenView_Previews: PreviewProvider {
             screen: FlowScreen(
                 id: "1",
                 type: .informational,
-                title: "Welcome",
-                subtitle: "Get started",
-                showProgress: true,
-                elements: []
+                showProgressBar: true,
+                root: .stack(StackElement(
+                    id: "root",
+                    axis: "vertical",
+                    spacing: 16,
+                    distribution: nil,
+                    alignItems: nil,
+                    backgroundColor: nil,
+                    padding: nil,
+                    margin: nil,
+                    width: nil,
+                    height: nil,
+                    borderRadius: nil,
+                    borderColor: nil,
+                    borderWidth: nil,
+                    tapBehaviors: nil,
+                    children: [
+                        .text(TextElement(
+                            id: "text1",
+                            content: "Welcome to the app!",
+                            fontSize: 24,
+                            color: "#000000",
+                            alignment: "center",
+                            fontWeight: "bold",
+                            padding: nil,
+                            margin: nil,
+                            width: nil,
+                            height: nil,
+                            tapBehaviors: nil
+                        ))
+                    ]
+                ))
             ),
             screenIndex: 0,
             totalScreens: 3,
