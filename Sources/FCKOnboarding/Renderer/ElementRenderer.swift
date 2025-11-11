@@ -16,8 +16,18 @@ enum ElementRenderer {
                 ButtonElementView(element: el, onNavigate: onNavigate)
             case .input(let el):
                 InputElementView(element: el)
+            case .email(let el):
+                EmailInputElementView(element: el)
+            case .phone(let el):
+                PhoneInputElementView(element: el)
+            case .number(let el):
+                NumberInputElementView(element: el)
+            case .toggle(let el):
+                ToggleElementView(element: el)
             case .datePicker(let el):
                 DatePickerElementView(element: el)
+            case .choice(let el):
+                ChoiceElementView(element: el)
             case .options(let el):
                 OptionsElementView(element: el)
             case .progressbar(let el):
@@ -507,21 +517,288 @@ struct ProgressBarElementView: View {
     }
 }
 
+// MARK: - Email Input Element
+
+struct EmailInputElementView: View {
+    let element: EmailInputElement
+    @State private var text = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label = element.label {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            TextField(element.placeholder ?? "email@example.com", text: $text)
+                .textFieldStyle(.roundedBorder)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .autocapitalization(.none)
+                .onChange(of: text) { newValue in
+                    if let variableKey = element.variableKey {
+                        FCKOnboarding.shared.saveResponse(key: variableKey, value: newValue)
+                    }
+                }
+        }
+        .applySpacing(padding: element.padding, margin: element.margin)
+        .applyDimensions(width: element.width, height: element.height)
+    }
+}
+
+// MARK: - Phone Input Element
+
+struct PhoneInputElementView: View {
+    let element: PhoneInputElement
+    @State private var text = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label = element.label {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text(countryFlag)
+                    .font(.title3)
+                TextField(element.placeholder ?? "Phone number", text: $text)
+                    .textFieldStyle(.roundedBorder)
+                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+                    .onChange(of: text) { newValue in
+                        if let variableKey = element.variableKey {
+                            FCKOnboarding.shared.saveResponse(key: variableKey, value: newValue)
+                        }
+                    }
+            }
+        }
+        .applySpacing(padding: element.padding, margin: element.margin)
+        .applyDimensions(width: element.width, height: element.height)
+    }
+
+    private var countryFlag: String {
+        switch element.countryCode?.uppercased() {
+        case "US": return "🇺🇸"
+        case "GB": return "🇬🇧"
+        case "CA": return "🇨🇦"
+        case "AU": return "🇦🇺"
+        case "DE": return "🇩🇪"
+        case "FR": return "🇫🇷"
+        case "ES": return "🇪🇸"
+        case "IT": return "🇮🇹"
+        case "MX": return "🇲🇽"
+        case "BR": return "🇧🇷"
+        default: return "🇺🇸"
+        }
+    }
+}
+
+// MARK: - Number Input Element
+
+struct NumberInputElementView: View {
+    let element: NumberInputElement
+    @State private var value: Double = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label = element.label {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            if element.showStepper == true {
+                Stepper(value: $value,
+                        in: (element.min ?? 0)...(element.max ?? 100),
+                        step: element.step ?? 1) {
+                    Text("\(Int(value))")
+                }
+                .onChange(of: value) { newValue in
+                    if let variableKey = element.variableKey {
+                        FCKOnboarding.shared.saveResponse(key: variableKey, value: "\(newValue)")
+                    }
+                }
+            } else {
+                TextField(element.placeholder ?? "0", value: $value, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .keyboardType(.decimalPad)
+                    .onChange(of: value) { newValue in
+                        if let variableKey = element.variableKey {
+                            FCKOnboarding.shared.saveResponse(key: variableKey, value: "\(newValue)")
+                        }
+                    }
+            }
+        }
+        .applySpacing(padding: element.padding, margin: element.margin)
+        .applyDimensions(width: element.width, height: element.height)
+    }
+}
+
+// MARK: - Toggle Element
+
+struct ToggleElementView: View {
+    let element: ToggleElement
+    @State private var isOn: Bool = false
+
+    var body: some View {
+        HStack {
+            if element.labelPosition?.lowercased() != "right" {
+                if let label = element.label {
+                    Text(label)
+                        .font(.body)
+                }
+                Spacer()
+            }
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Color(hex: element.onColor ?? "#00ff41"))
+                .onChange(of: isOn) { newValue in
+                    if let variableKey = element.variableKey {
+                        FCKOnboarding.shared.saveResponse(key: variableKey, value: "\(newValue)")
+                    }
+                }
+
+            if element.labelPosition?.lowercased() == "right" {
+                if let label = element.label {
+                    Text(label)
+                        .font(.body)
+                }
+            }
+        }
+        .applySpacing(padding: element.padding, margin: element.margin)
+        .applyDimensions(width: element.width, height: element.height)
+        .onAppear {
+            isOn = element.value ?? element.defaultValue ?? false
+        }
+    }
+}
+
+// MARK: - Choice Element
+
+struct ChoiceElementView: View {
+    let element: ChoiceElement
+    @State private var selectedOptions: Set<String> = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let label = element.label {
+                Text(label)
+                    .font(.headline)
+            }
+
+            ForEach(element.options) { option in
+                Button(action: {
+                    handleSelection(optionId: option.id)
+                }) {
+                    HStack(spacing: 12) {
+                        // Checkbox/Radio indicator
+                        if element.checkboxPosition?.lowercased() != "hidden" &&
+                           element.checkboxPosition?.lowercased() != "right" {
+                            selectionIndicator(isSelected: selectedOptions.contains(option.id))
+                        }
+
+                        if let icon = option.icon {
+                            Text(icon)
+                                .font(.title2)
+                        }
+
+                        Text(option.label)
+                            .font(.body)
+                            .foregroundColor(selectedOptions.contains(option.id) ?
+                                           Color(hex: element.selectedTextColor ?? "#000000") :
+                                           .primary)
+
+                        Spacer()
+
+                        if element.checkboxPosition?.lowercased() == "right" {
+                            selectionIndicator(isSelected: selectedOptions.contains(option.id))
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: element.optionBorderRadius ?? 12)
+                            .fill(selectedOptions.contains(option.id) ?
+                                  Color(hex: element.selectedBackgroundColor ?? "#00ff41").opacity(0.2) :
+                                  Color(hex: element.optionBackgroundColor ?? "#F5F5F5"))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: element.optionBorderRadius ?? 12)
+                            .stroke(selectedOptions.contains(option.id) ?
+                                  Color(hex: element.selectedBorderColor ?? "#00ff41") :
+                                  Color(hex: element.optionBorderColor ?? "#E5E5E5"),
+                                  lineWidth: 2)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .applySpacing(padding: element.padding, margin: element.margin)
+        .applyDimensions(width: element.width, height: element.height)
+        .onAppear {
+            if let defaults = element.defaultValue {
+                selectedOptions = Set(defaults)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func selectionIndicator(isSelected: Bool) -> some View {
+        if element.selectionMode.lowercased() == "multiple" {
+            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                .foregroundColor(isSelected ? Color(hex: element.selectedBorderColor ?? "#00ff41") : .gray)
+        } else {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isSelected ? Color(hex: element.selectedBorderColor ?? "#00ff41") : .gray)
+        }
+    }
+
+    private func handleSelection(optionId: String) {
+        if element.selectionMode.lowercased() == "multiple" {
+            // Toggle selection
+            if selectedOptions.contains(optionId) {
+                selectedOptions.remove(optionId)
+            } else {
+                selectedOptions.insert(optionId)
+            }
+        } else {
+            // Single selection
+            selectedOptions = [optionId]
+        }
+
+        // Save to responses
+        if let variableKey = element.variableKey {
+            let selectedValues = element.options
+                .filter { selectedOptions.contains($0.id) }
+                .map { $0.value ?? $0.label }
+
+            if element.selectionMode.lowercased() == "multiple" {
+                FCKOnboarding.shared.saveResponse(key: variableKey, value: selectedValues.joined(separator: ", "))
+            } else {
+                FCKOnboarding.shared.saveResponse(key: variableKey, value: selectedValues.first ?? "")
+            }
+        }
+    }
+}
+
 // MARK: - Helper Extensions
 
 extension View {
     func applySpacing(padding: Spacing?, margin: Spacing?) -> some View {
         self
             // Apply padding first (inside the element)
-            .padding(.top, CGFloat(padding?.top ?? 0))
-            .padding(.trailing, CGFloat(padding?.right ?? 0))
-            .padding(.bottom, CGFloat(padding?.bottom ?? 0))
-            .padding(.leading, CGFloat(padding?.left ?? 0))
+            .padding(.top, CGFloat(padding?.top.toDouble() ?? 0))
+            .padding(.trailing, CGFloat(padding?.right.toDouble() ?? 0))
+            .padding(.bottom, CGFloat(padding?.bottom.toDouble() ?? 0))
+            .padding(.leading, CGFloat(padding?.left.toDouble() ?? 0))
             // Then apply margin as additional padding (outside the element)
-            .padding(.top, CGFloat(margin?.top ?? 0))
-            .padding(.trailing, CGFloat(margin?.right ?? 0))
-            .padding(.bottom, CGFloat(margin?.bottom ?? 0))
-            .padding(.leading, CGFloat(margin?.left ?? 0))
+            .padding(.top, CGFloat(margin?.top.toDouble() ?? 0))
+            .padding(.trailing, CGFloat(margin?.right.toDouble() ?? 0))
+            .padding(.bottom, CGFloat(margin?.bottom.toDouble() ?? 0))
+            .padding(.leading, CGFloat(margin?.left.toDouble() ?? 0))
     }
 
     func applyDimensions(width: Dimension?, height: Dimension?) -> some View {
@@ -551,6 +828,7 @@ extension Dimension {
         case .fill: return 0
         case .fixed(let val): return CGFloat(val)
         case .percentage: return nil
+        case .rem, .em, .vw, .vh: return nil // These will be converted to fixed values
         }
     }
 
@@ -560,6 +838,10 @@ extension Dimension {
         case .fill: return .infinity
         case .fixed(let val): return CGFloat(val)
         case .percentage: return nil // Would need parent context
+        case .rem(let val): return CGFloat(val * 16) // 1rem = 16px
+        case .em(let val): return CGFloat(val * 16) // 1em = 16px
+        case .vw(let val): return CGFloat(val * 3.75) // 100vw = 375px (iPhone width)
+        case .vh(let val): return CGFloat(val * 6.67) // 100vh = 667px (iPhone height approx)
         }
     }
 }

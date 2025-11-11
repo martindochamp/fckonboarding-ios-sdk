@@ -15,8 +15,5 @@ let package = Package(
         .target(
             name: "FCKOnboarding",
             dependencies: []),
-        .testTarget(
-            name: "FCKOnboardingTests",
-            dependencies: ["FCKOnboarding"]),
     ]
 )
