@@ -44,14 +44,18 @@ struct StackElementView: View {
         let stack = Group {
             if isVertical {
                 VStack(alignment: horizontalAlignment, spacing: element.spacing ?? 0) {
-                    ForEach(element.children) { child in
-                        ElementRenderer.render(element: child, onNavigate: onNavigate)
+                    applyDistribution(vertical: true) {
+                        ForEach(element.children) { child in
+                            ElementRenderer.render(element: child, onNavigate: onNavigate)
+                        }
                     }
                 }
             } else {
                 HStack(alignment: verticalAlignment, spacing: element.spacing ?? 0) {
-                    ForEach(element.children) { child in
-                        ElementRenderer.render(element: child, onNavigate: onNavigate)
+                    applyDistribution(vertical: false) {
+                        ForEach(element.children) { child in
+                            ElementRenderer.render(element: child, onNavigate: onNavigate)
+                        }
                     }
                 }
             }
@@ -59,10 +63,59 @@ struct StackElementView: View {
 
         stack
             .frame(maxWidth: isVertical ? .infinity : nil)
-            .applySpacing(padding: element.padding, margin: element.margin)
+            .padding(.top, CGFloat(element.padding?.top ?? 0))
+            .padding(.trailing, CGFloat(element.padding?.right ?? 0))
+            .padding(.bottom, CGFloat(element.padding?.bottom ?? 0))
+            .padding(.leading, CGFloat(element.padding?.left ?? 0))
             .background(element.backgroundColor.flatMap { Color(hex: $0) })
             .applyDimensions(width: element.width, height: element.height)
             .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
+    }
+
+    @ViewBuilder
+    private func applyDistribution<Content: View>(vertical: Bool, @ViewBuilder content: () -> Content) -> some View {
+        let dist = element.distribution?.lowercased()
+
+        switch dist {
+        case "center":
+            if vertical {
+                Spacer()
+                content()
+                Spacer()
+            } else {
+                Spacer()
+                content()
+                Spacer()
+            }
+        case "space-between":
+            if vertical {
+                content()
+                Spacer()
+            } else {
+                content()
+                Spacer()
+            }
+        case "space-around", "space-evenly":
+            if vertical {
+                Spacer()
+                content()
+                Spacer()
+            } else {
+                Spacer()
+                content()
+                Spacer()
+            }
+        case "flex-end", "end":
+            if vertical {
+                Spacer()
+                content()
+            } else {
+                Spacer()
+                content()
+            }
+        default: // "flex-start", "start", or nil
+            content()
+        }
     }
 
     // Map alignItems to SwiftUI alignment for VStack (horizontal alignment of children)
@@ -193,7 +246,17 @@ struct ImageElementView: View {
         print("🖼️ [FCKOnboarding] Loading image from: \(url)")
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            // Create URLRequest with cache policy to always fetch fresh
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+
+            // Create session configuration with no cache
+            let config = URLSessionConfiguration.ephemeral
+            config.urlCache = nil
+            config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            let session = URLSession(configuration: config)
+
+            let (data, _) = try await session.data(for: request)
             if let uiImage = UIImage(data: data) {
                 print("✅ [FCKOnboarding] Successfully loaded image: \(url.lastPathComponent), size: \(uiImage.size)")
                 await MainActor.run {
