@@ -5,8 +5,10 @@ struct ScreenView: View {
     let screen: FlowScreen
     let screenIndex: Int
     let totalScreens: Int
+    let allScreens: [FlowScreen]?
     let onNext: () -> Void
     let onSkip: () -> Void
+    let onNavigate: ((String) -> Void)?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -28,7 +30,10 @@ struct ScreenView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(screen.elements) { element in
-                            ElementRenderer.render(element: element)
+                            ElementRenderer.render(
+                                element: element,
+                                onNavigate: handleTapBehavior
+                            )
                         }
                     }
                 }
@@ -40,6 +45,32 @@ struct ScreenView: View {
                     name: "screen_viewed",
                     screenIndex: screenIndex
                 )
+            }
+        }
+    }
+
+    private func handleTapBehavior(for element: FlowElement) {
+        // Extract tap behaviors from element
+        let behaviors: [TapBehavior]? = {
+            switch element {
+            case .button(let el): return el.tapBehaviors
+            case .image(let el): return el.tapBehaviors
+            case .text(let el): return el.tapBehaviors
+            case .stack(let el): return el.tapBehaviors
+            default: return nil
+            }
+        }()
+
+        guard let behaviors = behaviors else { return }
+
+        // Handle each behavior
+        for behavior in behaviors {
+            if behavior.isNavigation, let targetScreenId = behavior.targetScreenId {
+                // Navigate to specific screen
+                onNavigate?(targetScreenId)
+            } else if behavior.isBack {
+                // Go back (same as skip for now)
+                onSkip()
             }
         }
     }

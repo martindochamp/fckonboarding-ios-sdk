@@ -3,26 +3,32 @@ import SwiftUI
 /// Renders flow elements as native SwiftUI views
 enum ElementRenderer {
     @ViewBuilder
-    static func render(element: FlowElement) -> some View {
-        switch element {
-        case .stack(let el):
-            StackElementView(element: el)
-        case .text(let el):
-            TextElementView(element: el)
-        case .image(let el):
-            ImageElementView(element: el)
-        case .button(let el):
-            ButtonElementView(element: el)
-        case .input(let el):
-            InputElementView(element: el)
-        case .datePicker(let el):
-            DatePickerElementView(element: el)
-        case .options(let el):
-            OptionsElementView(element: el)
-        case .progressbar(let el):
-            ProgressBarElementView(element: el)
-        case .unknown:
-            EmptyView() // Silently skip unknown elements
+    static func render(element: FlowElement, onNavigate: @escaping (FlowElement) -> Void) -> some View {
+        Group {
+            switch element {
+            case .stack(let el):
+                StackElementView(element: el, onNavigate: onNavigate)
+            case .text(let el):
+                TextElementView(element: el)
+            case .image(let el):
+                ImageElementView(element: el)
+            case .button(let el):
+                ButtonElementView(element: el)
+            case .input(let el):
+                InputElementView(element: el)
+            case .datePicker(let el):
+                DatePickerElementView(element: el)
+            case .options(let el):
+                OptionsElementView(element: el)
+            case .progressbar(let el):
+                ProgressBarElementView(element: el)
+            case .unknown:
+                EmptyView() // Silently skip unknown elements
+            }
+        }
+        .contentShape(Rectangle()) // Make entire area tappable
+        .onTapGesture {
+            onNavigate(element)
         }
     }
 }
@@ -31,6 +37,7 @@ enum ElementRenderer {
 
 struct StackElementView: View {
     let element: StackElement
+    let onNavigate: (FlowElement) -> Void
 
     var body: some View {
         let isVertical = element.axis.lowercased() == "vertical"
@@ -38,13 +45,13 @@ struct StackElementView: View {
             if isVertical {
                 VStack(spacing: element.spacing ?? 0) {
                     ForEach(element.children) { child in
-                        ElementRenderer.render(element: child)
+                        ElementRenderer.render(element: child, onNavigate: onNavigate)
                     }
                 }
             } else {
                 HStack(spacing: element.spacing ?? 0) {
                     ForEach(element.children) { child in
-                        ElementRenderer.render(element: child)
+                        ElementRenderer.render(element: child, onNavigate: onNavigate)
                     }
                 }
             }

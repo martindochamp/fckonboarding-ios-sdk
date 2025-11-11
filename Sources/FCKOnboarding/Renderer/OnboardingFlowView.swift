@@ -57,6 +57,7 @@ public struct OnboardingFlowView: View {
                         screen: screen,
                         screenIndex: index,
                         totalScreens: config.screens.count,
+                        allScreens: config.screens,
                         onNext: {
                             if index < config.screens.count - 1 {
                                 withAnimation {
@@ -68,6 +69,9 @@ public struct OnboardingFlowView: View {
                         },
                         onSkip: {
                             skipFlow()
+                        },
+                        onNavigate: { targetScreenId in
+                            navigateToScreen(targetScreenId, in: config.screens)
                         }
                     )
                     .tag(index)
@@ -75,6 +79,14 @@ public struct OnboardingFlowView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea()
+        }
+    }
+
+    private func navigateToScreen(_ screenId: String, in screens: [FlowScreen]) {
+        if let targetIndex = screens.firstIndex(where: { $0.id == screenId }) {
+            withAnimation {
+                currentScreenIndex = targetIndex
+            }
         }
     }
 
@@ -88,6 +100,7 @@ public struct OnboardingFlowView: View {
                             screen: screen,
                             screenIndex: index,
                             totalScreens: config.screens.count,
+                            allScreens: config.screens,
                             onNext: {
                                 if index < config.screens.count - 1 {
                                     withAnimation {
@@ -99,6 +112,9 @@ public struct OnboardingFlowView: View {
                             },
                             onSkip: {
                                 skipFlow()
+                            },
+                            onNavigate: { targetScreenId in
+                                navigateToScreen(targetScreenId, in: config.screens)
                             }
                         )
                         .tag(index)

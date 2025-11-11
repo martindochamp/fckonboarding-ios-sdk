@@ -121,13 +121,27 @@ public struct TapBehavior: Codable, Equatable {
     public let type: String
     public let targetScreenId: String?
     public let intensity: String? // For haptics
-    public let customAction: String?
+    public let scale: Double? // For bump animation
+    public let duration: Double? // For bump animation
+    public let delay: Double? // Delay before navigation
 
     enum CodingKeys: String, CodingKey {
         case type
         case targetScreenId
         case intensity
-        case customAction
+        case scale
+        case duration
+        case delay
+    }
+
+    /// Check if this is a navigation behavior
+    public var isNavigation: Bool {
+        return type == "navigate"
+    }
+
+    /// Check if this is a back navigation behavior
+    public var isBack: Bool {
+        return type == "back"
     }
 }
 
