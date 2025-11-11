@@ -85,7 +85,7 @@ public enum FCKEnvironment {
         }
 
         // Add simulator flag if running in simulator
-        if isSimulator() {
+        if Self.isSimulator() {
             headers["X-Is-Simulator"] = "true"
         }
 

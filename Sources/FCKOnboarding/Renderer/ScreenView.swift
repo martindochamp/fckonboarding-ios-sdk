@@ -38,7 +38,7 @@ struct ScreenView: View {
             Task {
                 try? await FCKOnboarding.shared.trackEvent(
                     name: "screen_viewed",
-                    screenId: screen.id
+                    screenIndex: screenIndex
                 )
             }
         }
