@@ -77,6 +77,17 @@ struct StackElementView: View {
             .background(element.backgroundColor.flatMap { Color(hex: $0) })
             .applyDimensions(width: element.width, height: element.height)
             .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
+            .onAppear {
+                if let padding = element.padding {
+                    print("📐 [Stack \(element.id)] Padding - top: \(padding.top.toDouble()), right: \(padding.right.toDouble()), bottom: \(padding.bottom.toDouble()), left: \(padding.left.toDouble())")
+                }
+                if let margin = element.margin {
+                    print("📐 [Stack \(element.id)] Margin - top: \(margin.top.toDouble()), right: \(margin.right.toDouble()), bottom: \(margin.bottom.toDouble()), left: \(margin.left.toDouble())")
+                }
+                if let tapBehaviors = element.tapBehaviors {
+                    print("👆 [Stack \(element.id)] Has \(tapBehaviors.count) tap behavior(s)")
+                }
+            }
     }
 
     @ViewBuilder

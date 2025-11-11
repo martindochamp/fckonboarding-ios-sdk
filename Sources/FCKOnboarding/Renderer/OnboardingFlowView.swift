@@ -83,10 +83,16 @@ public struct OnboardingFlowView: View {
     }
 
     private func navigateToScreen(_ screenId: String, in screens: [FlowScreen]) {
+        print("🧭 [FCKOnboarding] Attempting to navigate to screen: \(screenId)")
         if let targetIndex = screens.firstIndex(where: { $0.id == screenId }) {
+            print("   ✅ Found screen at index: \(targetIndex)")
+            print("   Current index: \(currentScreenIndex) → New index: \(targetIndex)")
             withAnimation {
                 currentScreenIndex = targetIndex
             }
+        } else {
+            print("   ❌ Screen ID '\(screenId)' not found in flow")
+            print("   Available screens: \(screens.map { $0.id }.joined(separator: ", "))")
         }
     }
 

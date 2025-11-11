@@ -54,26 +54,46 @@ struct ScreenView: View {
     }
 
     private func handleTapBehavior(for element: FlowElement) {
+        print("🔔 [FCKOnboarding] Element tapped: \(element.id)")
+
         // Extract tap behaviors from element
         let behaviors: [TapBehavior]? = {
             switch element {
-            case .button(let el): return el.tapBehaviors
-            case .image(let el): return el.tapBehaviors
-            case .text(let el): return el.tapBehaviors
-            case .stack(let el): return el.tapBehaviors
-            default: return nil
+            case .button(let el):
+                print("   Type: button, tapBehaviors: \(el.tapBehaviors?.count ?? 0)")
+                return el.tapBehaviors
+            case .image(let el):
+                print("   Type: image, tapBehaviors: \(el.tapBehaviors?.count ?? 0)")
+                return el.tapBehaviors
+            case .text(let el):
+                print("   Type: text, tapBehaviors: \(el.tapBehaviors?.count ?? 0)")
+                return el.tapBehaviors
+            case .stack(let el):
+                print("   Type: stack, tapBehaviors: \(el.tapBehaviors?.count ?? 0)")
+                return el.tapBehaviors
+            default:
+                print("   Type: other (no tap behaviors)")
+                return nil
             }
         }()
 
-        guard let behaviors = behaviors else { return }
+        guard let behaviors = behaviors, !behaviors.isEmpty else {
+            print("   ⚠️ No tap behaviors found")
+            return
+        }
+
+        print("   ✅ Processing \(behaviors.count) tap behavior(s)")
 
         // Handle each behavior
         for behavior in behaviors {
+            print("      - Behavior type: \(behavior.type)")
             if behavior.isNavigation, let targetScreenId = behavior.targetScreenId {
                 // Navigate to specific screen
+                print("      → Navigating to screen: \(targetScreenId)")
                 onNavigate?(targetScreenId)
             } else if behavior.isBack {
                 // Go back (same as skip for now)
+                print("      → Going back")
                 onSkip()
             }
         }
