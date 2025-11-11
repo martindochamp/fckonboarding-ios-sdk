@@ -13,7 +13,7 @@ enum ElementRenderer {
             case .image(let el):
                 ImageElementView(element: el)
             case .button(let el):
-                ButtonElementView(element: el)
+                ButtonElementView(element: el, onNavigate: onNavigate)
             case .input(let el):
                 InputElementView(element: el)
             case .datePicker(let el):
@@ -220,6 +220,7 @@ struct ImageElementView: View {
 
 struct ButtonElementView: View {
     let element: ButtonElement
+    let onNavigate: (FlowElement) -> Void
 
     var body: some View {
         Button(action: handleAction) {
@@ -228,7 +229,7 @@ struct ButtonElementView: View {
                     // Render child elements
                     VStack {
                         ForEach(children) { child in
-                            ElementRenderer.render(element: child)
+                            ElementRenderer.render(element: child, onNavigate: onNavigate)
                         }
                     }
                 } else if let text = element.text {
