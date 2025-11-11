@@ -1,34 +1,70 @@
-# FCKOnboarding iOS SDK - Quick Start
+# iOS SDK - 60-Second Quickstart
 
-Get your onboarding flow running in 5 minutes!
+Get beautiful native onboarding flows running in **under 60 seconds**.
 
-## Step 1: Add Package Dependency
+## What You'll Get
 
-In Xcode:
-1. File → Add Package Dependencies
-2. Enter: `https://github.com/yourorg/fckonboarding-ios`
-3. Add to your app target
+A fully functional onboarding flow that:
+- Shows automatically on app launch
+- Renders natively in SwiftUI (no web views)
+- Updates instantly without app releases
+- Tracks analytics automatically
 
-Or in `Package.swift`:
+## Prerequisites
+
+- iOS 15.0+
+- Xcode 15.0+
+- A free fckonboarding account
+
+---
+
+## Step 1: Get Your API Key (10 seconds)
+
+1. Go to [fckonboarding.com/dashboard](https://fckonboarding.com/dashboard)
+2. Sign up or log in
+3. Navigate to **Settings → API Keys**
+4. Copy your API key
+
+---
+
+## Step 2: Add the SDK (15 seconds)
+
+### Using Xcode
+
+1. Open your project in Xcode
+2. **File → Add Package Dependencies**
+3. Paste this URL:
+   ```
+   https://github.com/martindochamp/fckonboarding-ios-sdk
+   ```
+4. Click **Add Package**
+5. Select your app target
+6. Click **Add Package** again
+
+### Or Using Package.swift
+
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourorg/fckonboarding-ios", from: "1.0.0")
+    .package(url: "https://github.com/martindochamp/fckonboarding-ios-sdk", from: "1.0.0")
 ]
 ```
 
-## Step 2: Configure SDK
+---
 
-In your `App.swift` or `AppDelegate.swift`:
+## Step 3: Configure SDK (20 seconds)
+
+Open your `App.swift` file and add these lines:
 
 ```swift
-import FCKOnboarding
+import SwiftUI
+import FCKOnboarding  // ← Add this
 
 @main
-struct MyApp: App {
+struct YourApp: App {
     init() {
-        // Configure with your project ID from dashboard
+        // ← Add this configuration
         FCKOnboarding.configure(
-            projectId: "f3aa686d-4b22-4a41-a314-f3a162473342", // Your project ID
+            apiKey: "YOUR_API_KEY_HERE",  // Paste your API key
             environment: .production
         )
     }
@@ -41,185 +77,198 @@ struct MyApp: App {
 }
 ```
 
-## Step 3: Show Onboarding
+**That's it for code setup!** ✨
 
-In any view:
+---
+
+## Step 4: Add Onboarding Gate (15 seconds)
+
+Open your main `ContentView.swift` and add `.onboardingGate()`:
 
 ```swift
 import SwiftUI
-import FCKOnboarding
+import FCKOnboarding  // ← Add this if not already there
 
 struct ContentView: View {
-    @State private var showOnboarding = false
-
     var body: some View {
         VStack {
             Text("Welcome to My App!")
                 .font(.largeTitle)
 
-            Button("Show Onboarding") {
-                showOnboarding = true
-            }
+            // Your app content here
         }
-        .onAppear {
-            // Show onboarding on first launch
-            if !FCKOnboarding.shared.hasCompletedOnboarding() {
-                showOnboarding = true
-            }
-        }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingFlowView { completed in
-                if completed {
-                    // User completed onboarding
-                    FCKOnboarding.shared.markCompleted()
-
-                    // Access user responses
-                    let responses = FCKOnboarding.shared.getUserResponses()
-                    print("User's name: \(responses["name"] ?? "Unknown")")
-                }
-                showOnboarding = false
-            }
-        }
+        .onboardingGate()  // ← Add this single line!
     }
 }
 ```
 
-## Step 4: Test It!
+**Done!** Your app is now ready to show onboarding flows. 🎉
 
-1. Run your app in simulator or device
-2. The onboarding flow will automatically fetch from your dashboard
-3. Any changes you make in the visual builder will appear instantly!
+---
 
-## Common Use Cases
+## Step 5: Create Your First Flow (Dashboard)
 
-### Full-Screen Modal (Recommended)
-```swift
-.sheet(isPresented: $showOnboarding) {
-    OnboardingFlowView { completed in
-        // Handle completion
-    }
-}
+Now let's create a flow in the dashboard:
+
+### 5a. Create a Flow
+
+1. Go to [Dashboard → Flows](https://fckonboarding.com/dashboard/flows)
+2. Click **"New Flow"**
+3. Design your onboarding (drag & drop interface)
+4. Click **"Publish"**
+
+### 5b. Create a Placement
+
+1. Go to [Dashboard → Placements](https://fckonboarding.com/dashboard/placements)
+2. Click **"New Placement"**
+3. Name it: **`main`** (this matches the code)
+4. Click **"Create"**
+
+### 5c. Create a Campaign
+
+1. Go to [Dashboard → Campaigns](https://fckonboarding.com/dashboard/campaigns)
+2. Click **"New Campaign"**
+3. Fill in:
+   - **Name**: "Welcome Campaign"
+   - **Placement**: Select "main"
+   - **Flow**: Select your published flow
+4. Click **"Save"**
+5. Toggle the campaign to **"Active"** ✅
+
+---
+
+## Step 6: Test It! 🚀
+
+1. Build and run your app (⌘R)
+2. Your onboarding flow appears automatically!
+3. Complete it
+4. Check your dashboard to see analytics
+
+---
+
+## What Just Happened?
+
+```
+You created a flow visually → Published it → Connected it to "main" placement
+                                                                    ↓
+Your app checks the "main" placement → SDK fetches the flow → Renders natively
 ```
 
-### Full-Screen Cover
+**The magic:** Change your flow in the dashboard and it updates in your app instantly - no code changes, no app release needed!
+
+---
+
+## Common Patterns
+
+### Multiple Placements
+
+Show different flows at different points:
+
 ```swift
-.fullScreenCover(isPresented: $showOnboarding) {
-    OnboardingFlowView { completed in
-        // Handle completion
-    }
-}
+// Main onboarding on launch
+ContentView()
+    .onboardingGate(placement: "main")
+
+// Feature tutorial when user navigates to feature
+FeatureView()
+    .onboardingGate(placement: "feature_tutorial")
+
+// Premium upsell before checkout
+CheckoutView()
+    .onboardingGate(placement: "premium_upsell")
 ```
 
-### Navigation Push
-```swift
-NavigationLink(destination: OnboardingFlowView { completed in
-    // Handle completion
-}, isActive: $showOnboarding) {
-    EmptyView()
-}
-```
+**In Dashboard:** Create campaigns for "feature_tutorial" and "premium_upsell"
 
-## Getting User Responses
+### User Targeting
 
-If your flow has input fields:
+Show flows to specific users:
 
 ```swift
-OnboardingFlowView { completed in
-    if completed {
-        let responses = FCKOnboarding.shared.getUserResponses()
-
-        // Access specific fields by their element ID
-        let userName = responses["user_name_input_id"]
-        let userEmail = responses["email_input_id"]
-        let selectedGoals = responses["goals_choice_id"]
-
-        print("Name: \(userName ?? "")")
-        print("Email: \(userEmail ?? "")")
-        print("Goals: \(selectedGoals ?? "")")
-
-        // Save to your backend or UserDefaults
-        UserDefaults.standard.set(userName, forKey: "userName")
-    }
-}
-```
-
-## Reset Onboarding (For Testing)
-
-```swift
-// Clear onboarding state and cache
-FCKOnboarding.shared.reset()
-
-// Show onboarding again
-showOnboarding = true
-```
-
-## Offline Support
-
-The SDK automatically caches flows locally:
-
-```swift
-// Cache-first (default) - Fast, uses cache then updates
-FCKOnboarding.configure(
-    projectId: "your-id",
-    cachePolicy: .cacheFirst
-)
-
-// Network-first - Always fresh, falls back to cache
-FCKOnboarding.configure(
-    projectId: "your-id",
-    cachePolicy: .networkFirst
-)
-
-// Network-only - Always fetch, no cache
-FCKOnboarding.configure(
-    projectId: "your-id",
-    cachePolicy: .networkOnly
-)
-```
-
-## Custom Analytics
-
-Track custom events:
-
-```swift
-// Track custom event
-try? await FCKOnboarding.shared.trackEvent(
-    name: "premium_feature_tapped",
-    properties: [
-        "feature": "dark_mode",
-        "source": "onboarding"
+.onboardingGate(
+    placement: "premium_upsell",
+    userProperties: [
+        "plan": "free",
+        "country": "US",
+        "signupDate": "2024-01-15"
     ]
 )
 ```
 
-## Troubleshooting
+**In Dashboard:** Create audiences with filters matching these properties
 
-### Flow Not Loading?
-1. Check your project ID is correct
-2. Ensure you have an active flow published in dashboard
-3. Check network connection
-4. Look for errors in console
+### Access User Responses
 
-### Need to Test Changes?
-1. Clear app cache: Delete app and reinstall
-2. Or reset SDK: `FCKOnboarding.shared.reset()`
-3. Force network fetch: Use `.networkOnly` cache policy
+Get input from onboarding forms:
 
-### Simulator Issues?
-- Make sure simulator has internet access
-- Try resetting simulator: Device → Erase All Content and Settings
+```swift
+.onboardingGate(
+    placement: "main",
+    onComplete: {
+        let responses = FCKOnboarding.shared.getUserResponses()
+        let userName = responses["name_input"]
+        let userEmail = responses["email_input"]
 
-## Next Steps
+        print("User: \(userName ?? ""), Email: \(userEmail ?? "")")
 
-- 📖 Read full [API Documentation](README.md)
-- 🎨 Customize flows in [Dashboard](https://fckonboarding.com/dashboard)
-- 💬 Join [Discord Community](https://discord.gg/fckonboarding)
-- 📧 Email support: support@fckonboarding.com
-
-## Example Project
-
-Check out the complete example app in `Examples/BasicIntegration/`
+        // Save to your backend or UserDefaults
+    }
+)
+```
 
 ---
 
-**Built with 💚 by the FCKOnboarding team**
+## Reset Onboarding (For Testing)
+
+During development, reset to see onboarding again:
+
+```swift
+FCKOnboarding.shared.reset()
+// Then restart your app
+```
+
+---
+
+## Troubleshooting
+
+### Flow not showing?
+
+1. **Check API Key**: Make sure it's correct in `configure()`
+2. **Check Placement**: Name must match exactly ("main" in code = "main" in dashboard)
+3. **Check Campaign**: Must be **Active** and linked to your placement
+4. **Check Flow**: Must be **Published** (not draft)
+5. **Try Reset**: `FCKOnboarding.shared.reset()` then restart app
+
+### Already completed?
+
+Once a user completes onboarding, they won't see it again (by design). Use `reset()` during testing.
+
+### Simulator not loading?
+
+- Check internet connection
+- Check Console for error messages
+- Try clearing derived data: Xcode → Product → Clean Build Folder
+
+---
+
+## What's Next?
+
+- **[Full API Documentation](README.md)** - All SDK features and options
+- **[Dashboard Guide](DASHBOARD.md)** - Visual guide to dashboard features
+- **[Examples](Examples/)** - Sample apps showing different patterns
+- **[Architecture Guide](ARCHITECTURE.md)** - How the SDK works internally
+
+---
+
+## Need Help?
+
+- 📖 [Full Documentation](README.md)
+- 💬 [Discord Community](https://discord.gg/fckonboarding)
+- 📧 [Email Support](mailto:support@fckonboarding.com)
+- 🐛 [GitHub Issues](https://github.com/martindochamp/fckonboarding-ios-sdk/issues)
+
+---
+
+**You're all set!** 🎉
+
+Your app now has professional onboarding that you can update anytime, without code changes or app releases.

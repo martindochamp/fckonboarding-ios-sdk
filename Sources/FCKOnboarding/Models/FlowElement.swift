@@ -3,22 +3,10 @@ import Foundation
 /// Base protocol for all flow elements
 public protocol FlowElementProtocol: Codable, Equatable, Identifiable {
     var id: String { get }
-    var type: ElementType { get }
+    var type: String { get } // Changed to String to handle any element type
 }
 
-/// All supported element types
-public enum ElementType: String, Codable {
-    case stack
-    case text
-    case image
-    case button
-    case input
-    case datePicker
-    case singleChoice
-    case multipleChoice
-}
-
-/// Type-erased wrapper for flow elements
+/// Type-erased wrapper for flow elements - matches builder output
 public enum FlowElement: Codable, Equatable, Identifiable {
     case stack(StackElement)
     case text(TextElement)
@@ -26,8 +14,9 @@ public enum FlowElement: Codable, Equatable, Identifiable {
     case button(ButtonElement)
     case input(InputElement)
     case datePicker(DatePickerElement)
-    case singleChoice(SingleChoiceElement)
-    case multipleChoice(MultipleChoiceElement)
+    case options(OptionsElement) // NEW: Matches builder "options" type
+    case progressbar(ProgressBarElement) // NEW: Matches builder "progressbar" type
+    case unknown([String: Any]) // Fallback for new element types
 
     public var id: String {
         switch self {
@@ -37,32 +26,43 @@ public enum FlowElement: Codable, Equatable, Identifiable {
         case .button(let el): return el.id
         case .input(let el): return el.id
         case .datePicker(let el): return el.id
-        case .singleChoice(let el): return el.id
-        case .multipleChoice(let el): return el.id
+        case .options(let el): return el.id
+        case .progressbar(let el): return el.id
+        case .unknown(let dict): return dict["id"] as? String ?? UUID().uuidString
         }
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(ElementType.self, forKey: .type)
+        let type = try container.decode(String.self, forKey: .type)
 
         switch type {
-        case .stack:
+        case "stack":
             self = .stack(try StackElement(from: decoder))
-        case .text:
+        case "text":
             self = .text(try TextElement(from: decoder))
-        case .image:
+        case "image":
             self = .image(try ImageElement(from: decoder))
-        case .button:
+        case "button":
             self = .button(try ButtonElement(from: decoder))
-        case .input:
+        case "input":
             self = .input(try InputElement(from: decoder))
-        case .datePicker:
+        case "datepicker", "datePicker":
             self = .datePicker(try DatePickerElement(from: decoder))
-        case .singleChoice:
-            self = .singleChoice(try SingleChoiceElement(from: decoder))
-        case .multipleChoice:
-            self = .multipleChoice(try MultipleChoiceElement(from: decoder))
+        case "options": // NEW: Handle options from builder
+            self = .options(try OptionsElement(from: decoder))
+        case "progressbar": // NEW: Handle progressbar from builder
+            self = .progressbar(try ProgressBarElement(from: decoder))
+        default:
+            // Handle unknown types gracefully
+            if let dict = try? decoder.singleValueContainer().decode([String: Any].self) {
+                self = .unknown(dict)
+            } else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(codingPath: decoder.codingPath,
+                                        debugDescription: "Unknown element type: \(type)")
+                )
+            }
         }
     }
 
@@ -74,8 +74,11 @@ public enum FlowElement: Codable, Equatable, Identifiable {
         case .button(let el): try el.encode(to: encoder)
         case .input(let el): try el.encode(to: encoder)
         case .datePicker(let el): try el.encode(to: encoder)
-        case .singleChoice(let el): try el.encode(to: encoder)
-        case .multipleChoice(let el): try el.encode(to: encoder)
+        case .options(let el): try el.encode(to: encoder)
+        case .progressbar(let el): try el.encode(to: encoder)
+        case .unknown(let dict):
+            var container = encoder.singleValueContainer()
+            try container.encode(dict)
         }
     }
 
@@ -84,15 +87,81 @@ public enum FlowElement: Codable, Equatable, Identifiable {
     }
 }
 
+// MARK: - Common Properties
+
+/// Base properties shared by all elements
+public struct ElementBase {
+    public let width: Dimension?
+    public let height: Dimension?
+    public let margin: Spacing?
+    public let padding: Spacing?
+    public let backgroundColor: String?
+    public let borderRadius: Double?
+    public let borderColor: String?
+    public let borderWidth: Double?
+    public let opacity: Double?
+    public let shadow: Shadow?
+    public let transform: Transform?
+    public let animation: Animation?
+    public let tapBehaviors: [TapBehavior]?
+}
+
+// MARK: - Tap Behaviors (NEW)
+
+public struct TapBehavior: Codable, Equatable {
+    public let type: String
+    public let targetScreenId: String?
+    public let intensity: String? // For haptics
+    public let customAction: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case targetScreenId
+        case intensity
+        case customAction
+    }
+}
+
+// MARK: - Dimensions
+
+public enum Dimension: Codable, Equatable {
+    case fill
+    case auto
+    case fixed(Double)
+    case percentage(Double)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let string = try? container.decode(String.self) {
+            switch string.lowercased() {
+            case "fill": self = .fill
+            case "auto": self = .auto
+            default:
+                if string.hasSuffix("%"), let value = Double(string.dropLast()) {
+                    self = .percentage(value)
+                } else if let value = Double(string) {
+                    self = .fixed(value)
+                } else {
+                    self = .auto
+                }
+            }
+        } else if let number = try? container.decode(Double.self) {
+            self = .fixed(number)
+        } else {
+            self = .auto
+        }
+    }
+}
+
 // MARK: - Spacing
 
 public struct Spacing: Codable, Equatable {
-    public let top: SpacingValue
-    public let right: SpacingValue
-    public let bottom: SpacingValue
-    public let left: SpacingValue
+    public let top: Double
+    public let right: Double
+    public let bottom: Double
+    public let left: Double
 
-    public init(top: SpacingValue = .px(0), right: SpacingValue = .px(0), bottom: SpacingValue = .px(0), left: SpacingValue = .px(0)) {
+    public init(top: Double = 0, right: Double = 0, bottom: Double = 0, left: Double = 0) {
         self.top = top
         self.right = right
         self.bottom = bottom
@@ -100,246 +169,268 @@ public struct Spacing: Codable, Equatable {
     }
 }
 
-public enum SpacingValue: Codable, Equatable {
-    case px(Double)
-    case percent(Double)
-    case rem(Double)
-    case em(Double)
-    case vh(Double)
-    case vw(Double)
-    case auto
+// MARK: - Shadow
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let string = try? container.decode(String.self) {
-            if string.lowercased() == "auto" {
-                self = .auto
-            } else if let value = Self.parse(string) {
-                self = value
-            } else {
-                self = .px(0)
-            }
-        } else if let number = try? container.decode(Double.self) {
-            self = .px(number)
-        } else {
-            self = .px(0)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .px(let val): try container.encode("\(val)px")
-        case .percent(let val): try container.encode("\(val)%")
-        case .rem(let val): try container.encode("\(val)rem")
-        case .em(let val): try container.encode("\(val)em")
-        case .vh(let val): try container.encode("\(val)vh")
-        case .vw(let val): try container.encode("\(val)vw")
-        case .auto: try container.encode("auto")
-        }
-    }
-
-    private static func parse(_ string: String) -> SpacingValue? {
-        let trimmed = string.trimmingCharacters(in: .whitespaces).lowercased()
-
-        if trimmed == "auto" {
-            return .auto
-        }
-
-        // Extract number and unit
-        let pattern = "^(-?\\d*\\.?\\d+)\\s*(px|%|rem|em|vh|vw)?$"
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
-              let numberRange = Range(match.range(at: 1), in: trimmed),
-              let number = Double(trimmed[numberRange]) else {
-            return nil
-        }
-
-        let unitRange = match.range(at: 2)
-        let unit = unitRange.location != NSNotFound ? String(trimmed[Range(unitRange, in: trimmed)!]) : "px"
-
-        switch unit {
-        case "%": return .percent(number)
-        case "rem": return .rem(number)
-        case "em": return .em(number)
-        case "vh": return .vh(number)
-        case "vw": return .vw(number)
-        default: return .px(number)
-        }
-    }
+public struct Shadow: Codable, Equatable {
+    public let type: String?
+    public let color: String?
+    public let blur: Double?
+    public let spread: Double?
+    public let offsetX: Double?
+    public let offsetY: Double?
 }
 
-// MARK: - Stack Element
+// MARK: - Transform
+
+public struct Transform: Codable, Equatable {
+    public let translateX: Double?
+    public let translateY: Double?
+    public let rotate: Double?
+    public let scale: Double?
+}
+
+// MARK: - Animation
+
+public struct Animation: Codable, Equatable {
+    public let properties: [String]?
+    public let duration: Double?
+    public let easing: String?
+    public let delay: Double?
+}
+
+// MARK: - Stack Element (UPDATED)
 
 public struct StackElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .stack
-    public let direction: Direction
-    public let spacing: Double
-    public let distribution: Distribution
+    public let type: String = "stack"
+    public let axis: String // Changed from 'direction' to match builder
+    public let spacing: Double?
+    public let distribution: String? // Now optional and uses string
+    public let alignItems: String? // NEW: Added to match builder
     public let backgroundColor: String?
     public let padding: Spacing?
     public let margin: Spacing?
+    public let width: Dimension?
+    public let height: Dimension?
+    public let borderRadius: Double?
+    public let borderColor: String?
+    public let borderWidth: Double?
+    public let tapBehaviors: [TapBehavior]?
     public let children: [FlowElement]
 
-    public enum Direction: String, Codable {
-        case vertical
-        case horizontal
-    }
-
-    public enum Distribution: String, Codable {
-        case start
-        case center
-        case end
-        case spaceBetween = "space-between"
-        case spaceAround = "space-around"
+    // Custom decoder to handle both old and new format
+    enum CodingKeys: String, CodingKey {
+        case id, type, axis, spacing, distribution, alignItems
+        case backgroundColor, padding, margin, width, height
+        case borderRadius, borderColor, borderWidth
+        case tapBehaviors, children
     }
 }
 
-// MARK: - Text Element
+// MARK: - Text Element (UPDATED)
 
 public struct TextElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .text
+    public let type: String = "text"
     public let content: String
-    public let fontSize: Double
-    public let color: String
-    public let alignment: Alignment
-    public let fontWeight: FontWeight
+    public let fontSize: Double?
+    public let color: String?
+    public let alignment: String?
+    public let fontWeight: String?
     public let padding: Spacing?
     public let margin: Spacing?
-
-    public enum Alignment: String, Codable {
-        case left, center, right
-    }
-
-    public enum FontWeight: String, Codable {
-        case normal, medium, bold, black
-    }
+    public let width: Dimension?
+    public let height: Dimension?
+    public let tapBehaviors: [TapBehavior]?
 }
 
-// MARK: - Image Element
+// MARK: - Image Element (UPDATED)
 
 public struct ImageElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .image
+    public let type: String = "image"
     public let url: String
     public let alt: String?
-    public let height: HeightValue
-    public let objectFit: ObjectFit
-    public let borderRadius: Double
+    public let width: Dimension?
+    public let height: Dimension?
+    public let objectFit: String?
+    public let borderRadius: Double?
     public let padding: Spacing?
     public let margin: Spacing?
-
-    public enum HeightValue: Codable, Equatable {
-        case auto
-        case fixed(Double)
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            if let string = try? container.decode(String.self), string == "auto" {
-                self = .auto
-            } else if let number = try? container.decode(Double.self) {
-                self = .fixed(number)
-            } else {
-                self = .auto
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            switch self {
-            case .auto: try container.encode("auto")
-            case .fixed(let val): try container.encode(val)
-            }
-        }
-    }
-
-    public enum ObjectFit: String, Codable {
-        case cover, contain, fill
-    }
+    public let tapBehaviors: [TapBehavior]?
 }
 
-// MARK: - Button Element
+// MARK: - Button Element (UPDATED)
 
 public struct ButtonElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .button
-    public let text: String
-    public let action: Action
-    public let style: Style
-    public let backgroundColor: String
-    public let textColor: String
+    public let type: String = "button"
+    public let text: String?
+    public let action: String?
+    public let style: String?
+    public let backgroundColor: String?
+    public let textColor: String?
     public let padding: Spacing?
     public let margin: Spacing?
-
-    public enum Action: String, Codable {
-        case next, skip, complete
-    }
-
-    public enum Style: String, Codable {
-        case filled, outline
-    }
+    public let width: Dimension?
+    public let height: Dimension?
+    public let borderRadius: Double?
+    public let tapBehaviors: [TapBehavior]?
+    public let children: [FlowElement]? // Buttons can have child elements (like text)
 }
 
 // MARK: - Input Element
 
 public struct InputElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .input
+    public let type: String = "input"
     public let placeholder: String?
     public let label: String?
-    public let inputType: InputType
-    public let required: Bool
+    public let inputType: String?
+    public let required: Bool?
+    public let variableKey: String?
     public let padding: Spacing?
     public let margin: Spacing?
-
-    public enum InputType: String, Codable {
-        case text, email, number, phone
-    }
+    public let width: Dimension?
+    public let height: Dimension?
+    public let tapBehaviors: [TapBehavior]?
 }
 
 // MARK: - DatePicker Element
 
 public struct DatePickerElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .datePicker
+    public let type: String = "datepicker"
     public let label: String?
-    public let mode: Mode
+    public let mode: String?
+    public let variableKey: String?
     public let padding: Spacing?
     public let margin: Spacing?
+    public let width: Dimension?
+    public let height: Dimension?
+}
 
-    public enum Mode: String, Codable {
-        case date, time, dateTime = "datetime"
+// MARK: - Options Element (NEW - Matches Builder)
+
+public struct OptionsElement: FlowElementProtocol {
+    public let id: String
+    public let type: String = "options"
+    public let options: [Option]
+    public let multiple: Bool?
+    public let selectedTextColor: String?
+    public let optionBorderRadius: Double?
+    public let optionBackgroundColor: String?
+    public let selectedBackgroundColor: String?
+    public let variableKey: String?
+    public let padding: Spacing?
+    public let margin: Spacing?
+    public let width: Dimension?
+    public let height: Dimension?
+
+    public struct Option: Codable, Equatable, Identifiable {
+        public let id: String
+        public let label: String
+        public let value: String
+        public let icon: String?
     }
 }
 
-// MARK: - SingleChoice Element
+// MARK: - Progress Bar Element (NEW - Matches Builder)
 
-public struct SingleChoiceElement: FlowElementProtocol {
+public struct ProgressBarElement: FlowElementProtocol {
     public let id: String
-    public let type: ElementType = .singleChoice
-    public let question: String
-    public let options: [ChoiceOption]
+    public let type: String = "progressbar"
+    public let progress: Double
+    public let barColor: String?
+    public let trackColor: String?
     public let padding: Spacing?
     public let margin: Spacing?
+    public let width: Dimension?
+    public let height: Dimension?
 }
 
-// MARK: - MultipleChoice Element
+// MARK: - Helper Extensions for Decoding Any
 
-public struct MultipleChoiceElement: FlowElementProtocol {
-    public let id: String
-    public let type: ElementType = .multipleChoice
-    public let question: String
-    public let options: [ChoiceOption]
-    public let padding: Spacing?
-    public let margin: Spacing?
+extension KeyedDecodingContainer {
+    func decode(_ type: [String: Any].Type, forKey key: K) throws -> [String: Any] {
+        let container = try self.nestedContainer(keyedBy: JSONCodingKey.self, forKey: key)
+        return try container.decode(type)
+    }
+
+    func decodeIfPresent(_ type: [String: Any].Type, forKey key: K) throws -> [String: Any]? {
+        guard contains(key) else { return nil }
+        return try decode(type, forKey: key)
+    }
+
+    func decode(_ type: [Any].Type, forKey key: K) throws -> [Any] {
+        var container = try self.nestedUnkeyedContainer(forKey: key)
+        return try container.decode(type)
+    }
+
+    func decodeIfPresent(_ type: [Any].Type, forKey key: K) throws -> [Any]? {
+        guard contains(key) else { return nil }
+        return try decode(type, forKey: key)
+    }
 }
 
-// MARK: - Choice Option
+struct JSONCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
 
-public struct ChoiceOption: Codable, Equatable, Identifiable {
-    public let id: String
-    public let text: String
-    public let icon: String?
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        self.intValue = intValue
+        self.stringValue = "\(intValue)"
+    }
+}
+
+extension KeyedDecodingContainer where K == JSONCodingKey {
+    func decode(_ type: [String: Any].Type) throws -> [String: Any] {
+        var dictionary = [String: Any]()
+
+        for key in allKeys {
+            if let value = try? decode(Bool.self, forKey: key) {
+                dictionary[key.stringValue] = value
+            } else if let value = try? decode(Int.self, forKey: key) {
+                dictionary[key.stringValue] = value
+            } else if let value = try? decode(Double.self, forKey: key) {
+                dictionary[key.stringValue] = value
+            } else if let value = try? decode(String.self, forKey: key) {
+                dictionary[key.stringValue] = value
+            } else if let value = try? decode([Any].self, forKey: key) {
+                dictionary[key.stringValue] = value
+            } else if let value = try? decode([String: Any].self, forKey: key) {
+                dictionary[key.stringValue] = value
+            }
+        }
+        return dictionary
+    }
+}
+
+extension UnkeyedDecodingContainer {
+    mutating func decode(_ type: [Any].Type) throws -> [Any] {
+        var array = [Any]()
+
+        while !isAtEnd {
+            if let value = try? decode(Bool.self) {
+                array.append(value)
+            } else if let value = try? decode(Int.self) {
+                array.append(value)
+            } else if let value = try? decode(Double.self) {
+                array.append(value)
+            } else if let value = try? decode(String.self) {
+                array.append(value)
+            } else if let value = try? decode([Any].self) {
+                array.append(value)
+            } else if let value = try? decode([String: Any].self) {
+                array.append(value)
+            } else {
+                _ = try? decode(String.self) // Skip unknown
+            }
+        }
+        return array
+    }
 }

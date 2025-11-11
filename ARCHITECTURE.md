@@ -1,16 +1,24 @@
 # FCKOnboarding iOS SDK - Architecture
 
+> **📚 Advanced Documentation**
+> This guide is for SDK contributors, advanced users, and those curious about internals.
+> **Just getting started?** → See [60-Second Quickstart](QUICKSTART.md) or [README](README.md) instead.
+
+---
+
 ## Overview
 
-The iOS SDK is a native Swift Package that renders onboarding flows created in the fckonboarding visual builder. It uses SwiftUI for rendering and fetches flow configurations from the API at runtime.
+The iOS SDK is a native Swift Package that renders onboarding flows created in the fckonboarding visual builder. It uses SwiftUI for rendering and fetches flow configurations from the API at runtime using a **placement-based architecture** similar to Superwall.
 
 ## Design Principles
 
 1. **Native First** - Pure SwiftUI, no web views
 2. **Type Safe** - Full Codable support with Swift types
 3. **Offline Ready** - Smart caching with fallbacks
-4. **Zero Config** - Works out of the box with minimal setup
-5. **Extensible** - Easy to customize and extend
+4. **Placement-Based** - Show different flows at different trigger points
+5. **Audience Targeting** - User property-based segmentation
+6. **Backend-First** - Completion tracking and variant assignment on server
+7. **Extensible** - Easy to customize and extend
 
 ## Module Structure
 
@@ -22,7 +30,11 @@ FCKOnboarding/
 │   └── FlowElement.swift     # All element types (Stack, Text, Image, etc.)
 │
 ├── Network/             # API communication
-│   └── FCKAPIClient.swift    # HTTP client for fetching flows & tracking events
+│   └── FCKAPIClient.swift    # HTTP client with placement-based endpoints
+│       - fetchFlowForPlacement()
+│       - checkCompletion()
+│       - recordCompletion()
+│       - trackEvent()
 │
 ├── Cache/               # Local persistence
 │   └── FlowCache.swift       # UserDefaults-based caching
@@ -32,39 +44,58 @@ FCKOnboarding/
 │   ├── ScreenView.swift           # Individual screen renderer
 │   └── ElementRenderer.swift      # Renders each element type
 │
-└── FCKOnboarding.swift  # Main SDK singleton
+├── OnboardingGate.swift  # SwiftUI component for automatic presentation
+└── FCKOnboarding.swift   # Main SDK singleton with placement methods
 ```
 
 ## Data Flow
 
+### Placement-Based Flow Fetching
+
 ```
-┌──────────────┐
-│   iOS App    │
-└──────┬───────┘
-       │ 1. Configure SDK
+┌──────────────────┐
+│   iOS App        │
+│   ContentView    │
+└──────┬───────────┘
+       │ .onboardingGate(placement: "main", userProperties: {...})
+       ▼
+┌──────────────────┐
+│ OnboardingGate   │
+│ (SwiftUI)        │
+└──────┬───────────┘
+       │ 1. checkAndPresentOnboarding()
        ▼
 ┌──────────────────┐
 │ FCKOnboarding    │
-│ (Singleton)      │
+│ .presentIfNeeded │
 └──────┬───────────┘
-       │ 2. Fetch flow
+       │ 2. fetchFlowForPlacement("main", userProps)
        ▼
-┌──────────────────┐     ┌──────────────┐
-│  FCKAPIClient    │────▶│  Cache       │
-│  GET /api/sdk/   │     │  (UserDefs)  │
-└──────┬───────────┘     └──────────────┘
-       │ 3. Return FlowResponse
+┌──────────────────────────────────┐     ┌──────────────┐
+│  FCKAPIClient                     │────▶│  Cache       │
+│  GET /api/sdk/placement/{name}    │     │  (UserDefs)  │
+│  ?deviceId=xxx&userProperties={} │     └──────────────┘
+└──────┬───────────────────────────┘
+       │ 3. Return PlacementFlowResponse {
+       │     flowId, config, placementId,
+       │     campaignId, variantId, isControl
+       │ }
+       ▼
+┌──────────────────┐
+│ OnboardingGate   │ ← Return FlowConfig or nil
+└──────┬───────────┘
+       │ 4. If config exists, show OnboardingFlowView
        ▼
 ┌──────────────────┐
 │ OnboardingFlowView│
 │  (SwiftUI)       │
 └──────┬───────────┘
-       │ 4. Render screens
+       │ 5. Render screens
        ▼
 ┌──────────────────┐
 │   ScreenView     │ → ForEach elements
 └──────┬───────────┘
-       │ 5. Render elements
+       │ 6. Render elements
        ▼
 ┌──────────────────┐
 │ ElementRenderer  │
@@ -75,8 +106,129 @@ FCKOnboarding/
 │ - InputView      │
 │ - DatePickerView │
 │ - ChoiceView     │
-└──────────────────┘
+└──────┬───────────┘
+       │ 7. User completes
+       ▼
+┌──────────────────────────────┐
+│ FCKOnboarding.markCompleted()│
+│ POST /api/sdk/completion      │
+│ {deviceId, flowId, variantId, │
+│  responses, ...}              │
+└───────────────────────────────┘
 ```
+
+## Placement-Based Architecture
+
+### Key Concepts
+
+**Placements**: Trigger points in your app where onboarding can appear
+- Each placement has a unique name (e.g., "main", "checkout", "feature_discovery")
+- Multiple campaigns can target the same placement
+- Priority-based selection when multiple campaigns match
+
+**Audiences**: User segments defined by filter conditions
+- Filters based on user properties (plan, country, etc.)
+- AND/OR logic for complex targeting
+- Evaluated on backend for each request
+
+**Campaigns**: Connect flows to placements with targeting rules
+- Link a flow to a placement
+- Optional audience targeting
+- Start/end dates
+- Priority for conflict resolution
+- A/B testing with variants
+
+**Variants**: Different versions of a flow for A/B testing
+- Each campaign can have multiple variants
+- Traffic split percentage (e.g., 50% variant A, 50% variant B)
+- Control group support (no flow shown)
+- Sticky assignment (user always sees same variant)
+
+### Backend Decision Logic
+
+When SDK calls `GET /api/sdk/placement/{name}`:
+
+1. **Find Active Campaigns**
+   - Get all campaigns for the placement
+   - Filter by active status and date range
+   - Check if user completed this flow before
+
+2. **Audience Matching**
+   - Evaluate user properties against audience filters
+   - Skip campaigns where audience doesn't match
+
+3. **Select Campaign**
+   - Sort by priority (highest first)
+   - Return highest priority matching campaign
+
+4. **Variant Assignment**
+   - Check if user already assigned to variant (sticky)
+   - If not, randomly assign based on traffic split
+   - Store assignment for future requests
+   - Return flow config or null (if control group)
+
+5. **Response**
+```json
+{
+  "flowId": "abc123",
+  "name": "Welcome Flow",
+  "config": { /* Full flow config */ },
+  "placementId": "pl_main",
+  "placementName": "main",
+  "campaignId": "camp_001",
+  "variantId": "var_a",
+  "isControl": false,
+  "isSticky": true,
+  "message": "Flow matched"
+}
+```
+
+### Completion Tracking
+
+When user completes onboarding:
+
+```swift
+await FCKOnboarding.shared.markCompleted()
+```
+
+SDK sends to backend:
+```json
+POST /api/sdk/completion
+{
+  "deviceId": "XXX",
+  "userId": "user-123",     // Optional
+  "flowId": "abc123",
+  "placementId": "pl_main",
+  "campaignId": "camp_001",
+  "variantId": "var_a",
+  "responses": {            // User input data
+    "name": "John",
+    "email": "john@example.com"
+  }
+}
+```
+
+Backend:
+- Records completion in database
+- Links to specific variant for A/B test results
+- Future requests for this placement return `null` (user completed)
+
+### User Identification
+
+SDK supports two user identification methods:
+
+1. **Device ID (Automatic)**
+   - Uses iOS IDFV (Identifier For Vendor)
+   - Persists across app reinstalls (same vendor)
+   - Unique per device
+
+2. **Custom User ID (Optional)**
+   ```swift
+   FCKOnboarding.shared.setUserId("user-123")
+   ```
+   - For authenticated users
+   - Enables cross-device tracking
+   - Syncs completion status across devices
 
 ## JSON to SwiftUI Mapping
 

@@ -6,7 +6,8 @@ public class FCKOnboarding {
 
     private var apiClient: FCKAPIClient?
     private let cache = FlowCache()
-    private var currentFlow: FlowResponse?
+    private var currentPlacementResponse: PlacementFlowResponse?
+    private var customUserId: String?
 
     public enum CachePolicy {
         case cacheFirst    // Try cache first, fallback to network
@@ -18,89 +19,97 @@ public class FCKOnboarding {
 
     private init() {}
 
-    /// Configure the SDK with your project credentials
+    /// Configure the SDK with your API key
     public static func configure(
-        projectId: String,
-        apiKey: String? = nil,
+        apiKey: String,
         environment: FCKAPIClient.Environment = .production,
         cachePolicy: CachePolicy = .cacheFirst
     ) {
         shared.apiClient = FCKAPIClient(
-            projectId: projectId,
             apiKey: apiKey,
             environment: environment
         )
         shared.cachePolicy = cachePolicy
     }
 
-    /// Fetch the active onboarding flow
-    public func fetchFlow() async throws -> FlowResponse {
+    /// Set custom user ID (optional - defaults to device ID)
+    public func setUserId(_ userId: String?) {
+        customUserId = userId
+    }
+
+    /// Fetch flow for a placement
+    /// Returns nil if user has completed or is in holdout group
+    public func fetchFlow(
+        for placement: String = "main",
+        userProperties: [String: Any]? = nil
+    ) async throws -> PlacementFlowResponse? {
         guard let apiClient = apiClient else {
             throw FCKError.notConfigured
         }
 
-        switch cachePolicy {
-        case .cacheFirst:
-            // Try cache first
-            if let cached = try? cache.loadFlow() {
-                currentFlow = cached
-                // Fetch new version in background
-                Task {
-                    try? await fetchFromNetwork()
-                }
-                return cached
-            }
-            // Cache miss, fetch from network
-            return try await fetchFromNetwork()
+        let response = try await apiClient.fetchFlowForPlacement(
+            placement,
+            userId: customUserId,
+            userProperties: userProperties
+        )
 
-        case .networkFirst:
-            do {
-                return try await fetchFromNetwork()
-            } catch {
-                // Network failed, try cache
-                if let cached = try? cache.loadFlow() {
-                    currentFlow = cached
-                    return cached
-                }
-                throw error
-            }
-
-        case .networkOnly:
-            return try await fetchFromNetwork()
-        }
+        currentPlacementResponse = response
+        return response
     }
 
-    private func fetchFromNetwork() async throws -> FlowResponse {
+    /// Present onboarding if needed
+    /// Returns flow config if should be shown, nil if completed or in holdout
+    @MainActor
+    public func presentIfNeeded(
+        for placement: String = "main",
+        userProperties: [String: Any]? = nil
+    ) async throws -> FlowConfig? {
+        // Fetch flow for placement
+        let response = try await fetchFlow(for: placement, userProperties: userProperties)
+
+        // User completed or in holdout
+        guard let flowConfig = response?.config else {
+            return nil
+        }
+
+        return flowConfig
+    }
+
+    /// Check if user has completed onboarding (from backend)
+    public func checkCompletion() async throws -> Bool {
         guard let apiClient = apiClient else {
             throw FCKError.notConfigured
         }
 
-        let flow = try await apiClient.fetchActiveFlow()
-        currentFlow = flow
-
-        // Cache the flow
-        try? cache.saveFlow(flow)
-
-        // Track fetch event
-        try? await trackEvent(name: "flow_fetched", flowId: flow.flowId)
-
-        return flow
+        let response = try await apiClient.checkCompletion(userId: customUserId)
+        return response.completed
     }
 
-    /// Check if user has completed onboarding
-    public func hasCompletedOnboarding() -> Bool {
-        return UserDefaults.standard.hasCompletedOnboarding
-    }
+    /// Mark onboarding as completed (syncs with backend)
+    public func markCompleted() async {
+        guard let apiClient = apiClient else {
+            return
+        }
 
-    /// Mark onboarding as completed
-    public func markCompleted() {
-        UserDefaults.standard.hasCompletedOnboarding = true
+        do {
+            try await apiClient.recordCompletion(
+                userId: customUserId,
+                flowId: currentPlacementResponse?.flowId,
+                placementId: currentPlacementResponse?.placementId,
+                campaignId: currentPlacementResponse?.campaignId,
+                variantId: currentPlacementResponse?.variantId,
+                responses: getUserResponses()
+            )
 
-        // Track completion
-        if let flowId = currentFlow?.flowId {
-            Task {
+            // Also mark locally for offline access
+            UserDefaults.standard.hasCompletedOnboarding = true
+
+            // Track completion event
+            if let flowId = currentPlacementResponse?.flowId {
                 try? await trackEvent(name: "flow_completed", flowId: flowId)
             }
+        } catch {
+            print("Failed to record completion: \(error)")
         }
     }
 
@@ -120,7 +129,7 @@ public class FCKOnboarding {
     public func reset() {
         UserDefaults.standard.resetOnboarding()
         cache.clearCache()
-        currentFlow = nil
+        currentPlacementResponse = nil
     }
 
     /// Track analytics event
@@ -134,7 +143,7 @@ public class FCKOnboarding {
             throw FCKError.notConfigured
         }
 
-        let finalFlowId = flowId ?? currentFlow?.flowId
+        let finalFlowId = flowId ?? currentPlacementResponse?.flowId
         try await apiClient.trackEvent(
             eventName: name,
             flowId: finalFlowId,

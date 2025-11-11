@@ -1,28 +1,12 @@
 import Foundation
+import UIKit
 
 /// API client for fetching onboarding flows
 public class FCKAPIClient {
-    private let baseURL: String
-    private let projectId: String
-    private let apiKey: String?
+    private let apiKey: String
     private let session: URLSession
-
-    public enum Environment {
-        case production
-        case staging
-        case custom(String)
-
-        var baseURL: String {
-            switch self {
-            case .production:
-                return "https://fckonboarding.com/api/sdk"
-            case .staging:
-                return "https://staging.fckonboarding.com/api/sdk"
-            case .custom(let url):
-                return url
-            }
-        }
-    }
+    private let environment: FCKEnvironment
+    private let debugMode: Bool
 
     public enum APIError: Error, LocalizedError {
         case invalidURL
@@ -31,6 +15,7 @@ public class FCKAPIClient {
         case networkError(Error)
         case serverError(Int, String?)
         case noActiveFlow
+        case usageLimitExceeded
 
         public var errorDescription: String? {
             switch self {
@@ -45,111 +30,262 @@ public class FCKAPIClient {
             case .serverError(let code, let message):
                 return "Server error (\(code)): \(message ?? "Unknown error")"
             case .noActiveFlow:
-                return "No active onboarding flow found for this project"
+                return "No active onboarding flow found"
+            case .usageLimitExceeded:
+                return "Usage limit exceeded. Please upgrade your plan."
             }
         }
     }
 
-    public init(
-        projectId: String,
-        apiKey: String? = nil,
-        environment: Environment = .production,
-        session: URLSession = .shared
-    ) {
-        self.projectId = projectId
+    public init(apiKey: String, debugMode: Bool = false) {
         self.apiKey = apiKey
-        self.baseURL = environment.baseURL
-        self.session = session
+        self.debugMode = debugMode
+        self.environment = FCKEnvironment.current
+
+        // Configure URLSession with caching
+        let config = URLSessionConfiguration.default
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.urlCache = URLCache(
+            memoryCapacity: 10 * 1024 * 1024,  // 10 MB
+            diskCapacity: 50 * 1024 * 1024,     // 50 MB
+            diskPath: "FCKOnboardingCache"
+        )
+        self.session = URLSession(configuration: config)
+
+        if debugMode {
+            FCKEnvironment.logEnvironmentInfo()
+        }
     }
 
-    /// Fetch the active onboarding flow for the configured project
-    public func fetchActiveFlow() async throws -> FlowResponse {
-        var components = URLComponents(string: "\(baseURL)/flows/active")
-        components?.queryItems = [
-            URLQueryItem(name: "projectId", value: projectId)
-        ]
-
-        guard let url = components?.url else {
+    /// Fetch flow for a specific placement
+    public func fetchFlow(
+        placement: String = "main",
+        userId: String? = nil,
+        deviceId: String? = nil,
+        userProperties: [String: Any]? = nil
+    ) async throws -> PlacementFlowResponse {
+        let urlString = "\(environment.baseURL)/api/sdk/placement/\(placement)"
+        guard let url = URL(string: urlString) else {
             throw APIError.invalidURL
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let apiKey = apiKey {
-            request.setValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        // Add headers
+        var headers = environment.headers
+        headers["X-API-Key"] = apiKey
+
+        if let userId = userId {
+            headers["X-User-Id"] = userId
+        }
+        if let deviceId = deviceId ?? UIDevice.current.identifierForVendor?.uuidString {
+            headers["X-Device-Id"] = deviceId
+        }
+
+        // Add user properties
+        if let properties = userProperties {
+            if let jsonData = try? JSONSerialization.data(withJSONObject: properties),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                headers["X-User-Properties"] = jsonString.data(using: .utf8)?.base64EncodedString()
+            }
+        }
+
+        request.allHTTPHeaderFields = headers
+
+        if debugMode {
+            print("🌐 FCKOnboarding API Request:")
+            print("  - URL: \(urlString)")
+            print("  - Environment: \(environment.displayName)")
+            print("  - Placement: \(placement)")
+            print("  - Headers: \(headers)")
         }
 
         do {
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.noData
+                throw APIError.networkError(URLError(.badServerResponse))
             }
 
-            guard (200...299).contains(httpResponse.statusCode) else {
-                let errorMessage = String(data: data, encoding: .utf8)
-                throw APIError.serverError(httpResponse.statusCode, errorMessage)
+            if debugMode {
+                print("📡 FCKOnboarding API Response:")
+                print("  - Status: \(httpResponse.statusCode)")
+                print("  - Data size: \(data.count) bytes")
             }
 
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
+            // Handle specific status codes
+            switch httpResponse.statusCode {
+            case 200:
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                do {
+                    let flowResponse = try decoder.decode(PlacementFlowResponse.self, from: data)
 
-            do {
-                let flowResponse = try decoder.decode(FlowResponse.self, from: data)
-                return flowResponse
-            } catch {
-                throw APIError.decodingError(error)
+                    // Check if it's a "no flow" response
+                    if flowResponse.flowId == nil && flowResponse.message != nil {
+                        if debugMode {
+                            print("ℹ️ No flow available: \(flowResponse.message ?? "")")
+                        }
+                        throw APIError.noActiveFlow
+                    }
+
+                    return flowResponse
+                } catch {
+                    if debugMode {
+                        print("❌ Decoding error: \(error)")
+                        if let jsonString = String(data: data, encoding: .utf8) {
+                            print("Raw response: \(jsonString)")
+                        }
+                    }
+                    throw APIError.decodingError(error)
+                }
+
+            case 401:
+                throw APIError.serverError(401, "Invalid API key")
+            case 404:
+                throw APIError.noActiveFlow
+            case 429:
+                throw APIError.usageLimitExceeded
+            default:
+                let message = String(data: data, encoding: .utf8)
+                throw APIError.serverError(httpResponse.statusCode, message)
             }
-        } catch let error as APIError {
-            throw error
         } catch {
+            if error is APIError {
+                throw error
+            }
             throw APIError.networkError(error)
         }
     }
 
-    /// Track analytics event
-    public func trackEvent(
-        eventName: String,
-        flowId: String?,
-        screenId: String?,
-        properties: [String: Any]? = nil
+    /// Mark onboarding as completed
+    public func markCompleted(
+        userId: String? = nil,
+        deviceId: String? = nil,
+        flowId: String? = nil,
+        responses: [String: Any]? = nil
     ) async throws {
-        var components = URLComponents(string: "\(baseURL)/events")
-        guard let url = components?.url else {
+        let urlString = "\(environment.baseURL)/api/sdk/completion"
+        guard let url = URL(string: urlString) else {
             throw APIError.invalidURL
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let apiKey = apiKey {
-            request.setValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        // Add headers
+        var headers = environment.headers
+        headers["X-API-Key"] = apiKey
+        headers["Content-Type"] = "application/json"
+        request.allHTTPHeaderFields = headers
+
+        // Build request body
+        var body: [String: Any] = [:]
+        if let userId = userId {
+            body["userId"] = userId
         }
-
-        var body: [String: Any] = [
-            "projectId": projectId,
-            "eventName": eventName,
-            "timestamp": ISO8601DateFormatter().string(from: Date())
-        ]
-
+        if let deviceId = deviceId ?? UIDevice.current.identifierForVendor?.uuidString {
+            body["deviceId"] = deviceId
+        }
         if let flowId = flowId {
             body["flowId"] = flowId
         }
-        if let screenId = screenId {
-            body["screenId"] = screenId
-        }
-        if let properties = properties {
-            body["properties"] = properties
+        if let responses = responses {
+            body["responses"] = responses
         }
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        // Fire and forget - don't block on analytics
-        Task.detached {
-            _ = try? await self.session.data(for: request)
+        if debugMode {
+            print("📤 Marking onboarding completed:")
+            print("  - User ID: \(userId ?? "N/A")")
+            print("  - Device ID: \(deviceId ?? "N/A")")
+            print("  - Flow ID: \(flowId ?? "N/A")")
+        }
+
+        let (_, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.networkError(URLError(.badServerResponse))
+        }
+
+        if httpResponse.statusCode != 200 {
+            throw APIError.serverError(httpResponse.statusCode, "Failed to mark completion")
+        }
+
+        if debugMode {
+            print("✅ Onboarding marked as completed")
+        }
+    }
+
+    /// Track analytics event
+    public func trackEvent(
+        eventType: String,
+        userId: String? = nil,
+        sessionId: String? = nil,
+        flowId: String? = nil,
+        screenIndex: Int? = nil,
+        metadata: [String: Any]? = nil
+    ) async throws {
+        let urlString = "\(environment.baseURL)/api/sdk/events"
+        guard let url = URL(string: urlString) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        // Add headers
+        var headers = environment.headers
+        headers["X-API-Key"] = apiKey
+        headers["Content-Type"] = "application/json"
+        request.allHTTPHeaderFields = headers
+
+        // Build event body
+        var body: [String: Any] = [
+            "eventType": eventType,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+
+        if let userId = userId {
+            body["userId"] = userId
+        }
+        if let sessionId = sessionId {
+            body["sessionId"] = sessionId
+        }
+        if let flowId = flowId {
+            body["flowId"] = flowId
+        }
+        if let screenIndex = screenIndex {
+            body["screenIndex"] = screenIndex
+        }
+        if let metadata = metadata {
+            body["metadata"] = metadata
+        }
+
+        // Add device info
+        body["platform"] = "ios"
+        body["deviceInfo"] = [
+            "osVersion": UIDevice.current.systemVersion,
+            "deviceModel": UIDevice.current.model,
+            "appVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        ]
+
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        // Fire and forget - don't wait for response
+        Task {
+            do {
+                let (_, response) = try await session.data(for: request)
+                if debugMode, let httpResponse = response as? HTTPURLResponse {
+                    print("📊 Event tracked: \(eventType) - Status: \(httpResponse.statusCode)")
+                }
+            } catch {
+                if debugMode {
+                    print("⚠️ Failed to track event: \(error)")
+                }
+            }
         }
     }
 }
