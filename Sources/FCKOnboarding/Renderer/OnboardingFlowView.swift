@@ -5,28 +5,76 @@ public struct OnboardingFlowView: View {
     @StateObject private var viewModel = OnboardingFlowViewModel()
     @State private var currentScreenIndex = 0
 
+    private let config: FlowConfig?
     private let onComplete: (Bool) -> Void
 
+    /// Initialize with a pre-fetched config (used by OnboardingGate)
+    public init(config: FlowConfig, onComplete: @escaping (Bool) -> Void) {
+        self.config = config
+        self.onComplete = onComplete
+    }
+
+    /// Initialize without config - will fetch flow automatically
     public init(onComplete: @escaping (Bool) -> Void) {
+        self.config = nil
         self.onComplete = onComplete
     }
 
     public var body: some View {
         Group {
-            switch viewModel.state {
-            case .loading:
-                ProgressView("Loading...")
-                    .progressViewStyle(.circular)
+            // If config was provided, use it directly
+            if let config = config {
+                flowContentFromConfig(config: config)
+            } else {
+                // Otherwise load via view model
+                switch viewModel.state {
+                case .loading:
+                    ProgressView("Loading...")
+                        .progressViewStyle(.circular)
 
-            case .loaded(let flow):
-                flowContent(flow: flow)
+                case .loaded(let flow):
+                    flowContent(flow: flow)
 
-            case .error(let error):
-                errorView(error: error)
+                case .error(let error):
+                    errorView(error: error)
+                }
             }
         }
         .task {
-            await viewModel.loadFlow()
+            // Only load if config wasn't provided
+            if config == nil {
+                await viewModel.loadFlow()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func flowContentFromConfig(config: FlowConfig) -> some View {
+        ZStack {
+            TabView(selection: $currentScreenIndex) {
+                ForEach(Array(config.screens.enumerated()), id: \.element.id) { index, screen in
+                    ScreenView(
+                        screen: screen,
+                        screenIndex: index,
+                        totalScreens: config.screens.count,
+                        onNext: {
+                            if index < config.screens.count - 1 {
+                                withAnimation {
+                                    currentScreenIndex = index + 1
+                                }
+                            } else {
+                                completeFlow()
+                            }
+                        },
+                        onSkip: {
+                            skipFlow()
+                        }
+                    )
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
         }
     }
 

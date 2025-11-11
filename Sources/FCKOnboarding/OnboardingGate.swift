@@ -38,16 +38,18 @@ public struct OnboardingGate<Content: View>: View {
 
             // Onboarding flow
             if showOnboarding, let config = flowConfig {
-                OnboardingFlowView(config: config) {
-                    // User completed onboarding
+                OnboardingFlowView(config: config, onComplete: { completed in
+                    // User completed or skipped onboarding
                     Task {
-                        await FCKOnboarding.shared.markCompleted()
+                        if completed {
+                            await FCKOnboarding.shared.markCompleted()
+                        }
                         withAnimation {
                             showOnboarding = false
                         }
                         onComplete?()
                     }
-                }
+                })
                 .transition(.opacity)
             }
         }
