@@ -146,6 +146,10 @@ struct ImageElementView: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
+                    .frame(
+                        width: element.width == nil ? defaultSize : nil,
+                        height: element.height == nil ? defaultSize : nil
+                    )
                     .cornerRadius(element.borderRadius ?? 0)
             } else {
                 // Placeholder - image failed to load
@@ -181,26 +185,30 @@ struct ImageElementView: View {
 
     private func loadImage() async {
         guard let url = URL(string: element.url) else {
-            print("⚠️ Invalid image URL: \(element.url)")
+            print("⚠️ [FCKOnboarding] Invalid image URL: \(element.url)")
             isLoading = false
             return
         }
 
+        print("🖼️ [FCKOnboarding] Loading image from: \(url)")
+
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             if let uiImage = UIImage(data: data) {
+                print("✅ [FCKOnboarding] Successfully loaded image: \(url.lastPathComponent), size: \(uiImage.size)")
                 await MainActor.run {
                     self.image = uiImage
                     self.isLoading = false
                 }
             } else {
-                print("⚠️ Failed to decode image from URL: \(url)")
+                print("⚠️ [FCKOnboarding] Failed to decode image data from URL: \(url)")
                 await MainActor.run {
                     self.isLoading = false
                 }
             }
         } catch {
-            print("⚠️ Failed to load image from URL: \(url), error: \(error)")
+            print("⚠️ [FCKOnboarding] Network error loading image from URL: \(url)")
+            print("   Error: \(error.localizedDescription)")
             await MainActor.run {
                 self.isLoading = false
             }
