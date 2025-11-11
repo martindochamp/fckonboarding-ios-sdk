@@ -310,7 +310,7 @@ struct ButtonElementView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(element.padding?.top ?? 12)
+            .padding(element.padding?.top.toDouble() ?? 12)
             .background(isFilled ? (Color(hex: element.backgroundColor ?? "#007AFF")) : Color.clear)
             .overlay(
                 isOutline ?
