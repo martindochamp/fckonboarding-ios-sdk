@@ -63,10 +63,7 @@ struct StackElementView: View {
 
         stack
             .frame(maxWidth: isVertical ? .infinity : nil)
-            .padding(.top, CGFloat(element.padding?.top ?? 0))
-            .padding(.trailing, CGFloat(element.padding?.right ?? 0))
-            .padding(.bottom, CGFloat(element.padding?.bottom ?? 0))
-            .padding(.leading, CGFloat(element.padding?.left ?? 0))
+            .applySpacing(padding: element.padding, margin: element.margin)
             .background(element.backgroundColor.flatMap { Color(hex: $0) })
             .applyDimensions(width: element.width, height: element.height)
             .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
@@ -515,11 +512,16 @@ struct ProgressBarElementView: View {
 extension View {
     func applySpacing(padding: Spacing?, margin: Spacing?) -> some View {
         self
+            // Apply padding first (inside the element)
             .padding(.top, CGFloat(padding?.top ?? 0))
             .padding(.trailing, CGFloat(padding?.right ?? 0))
             .padding(.bottom, CGFloat(padding?.bottom ?? 0))
             .padding(.leading, CGFloat(padding?.left ?? 0))
-            // Note: SwiftUI doesn't have margin, we use padding as approximation
+            // Then apply margin as additional padding (outside the element)
+            .padding(.top, CGFloat(margin?.top ?? 0))
+            .padding(.trailing, CGFloat(margin?.right ?? 0))
+            .padding(.bottom, CGFloat(margin?.bottom ?? 0))
+            .padding(.leading, CGFloat(margin?.left ?? 0))
     }
 
     func applyDimensions(width: Dimension?, height: Dimension?) -> some View {
