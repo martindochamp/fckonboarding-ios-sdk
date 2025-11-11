@@ -61,7 +61,7 @@ public enum FCKEnvironment {
 
     /// The base URL for API calls (same for both environments)
     public var baseURL: String {
-        return "https://api.fckonboarding.com"
+        return "https://fckonboarding.com"
     }
 
     /// Headers to include with API requests
