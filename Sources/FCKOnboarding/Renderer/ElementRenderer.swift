@@ -121,15 +121,17 @@ struct ImageElementView: View {
         Group {
             if isLoading {
                 ProgressView()
+                    .frame(width: defaultSize, height: defaultSize)
             } else if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
                     .cornerRadius(element.borderRadius ?? 0)
             } else {
-                // Placeholder
+                // Placeholder - image failed to load
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
+                    .frame(width: defaultSize, height: defaultSize)
                     .cornerRadius(element.borderRadius ?? 0)
                     .overlay(
                         Image(systemName: "photo")
@@ -144,6 +146,11 @@ struct ImageElementView: View {
         }
     }
 
+    // Default size if no dimensions specified
+    private var defaultSize: CGFloat {
+        return 100
+    }
+
     private var contentMode: ContentMode {
         switch element.objectFit?.lowercased() {
         case "cover", "fill": return .fill
@@ -154,6 +161,7 @@ struct ImageElementView: View {
 
     private func loadImage() async {
         guard let url = URL(string: element.url) else {
+            print("⚠️ Invalid image URL: \(element.url)")
             isLoading = false
             return
         }
@@ -165,8 +173,14 @@ struct ImageElementView: View {
                     self.image = uiImage
                     self.isLoading = false
                 }
+            } else {
+                print("⚠️ Failed to decode image from URL: \(url)")
+                await MainActor.run {
+                    self.isLoading = false
+                }
             }
         } catch {
+            print("⚠️ Failed to load image from URL: \(url), error: \(error)")
             await MainActor.run {
                 self.isLoading = false
             }

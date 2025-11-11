@@ -26,15 +26,19 @@ struct ScreenView: View {
                     .padding(.top, 8)
                 }
 
-                // Screen content
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(screen.elements) { element in
-                            ElementRenderer.render(
-                                element: element,
-                                onNavigate: handleTapBehavior
-                            )
+                // Screen content - centered in remaining space
+                GeometryReader { geometry in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(screen.elements) { element in
+                                ElementRenderer.render(
+                                    element: element,
+                                    onNavigate: handleTapBehavior
+                                )
+                            }
                         }
+                        .frame(minHeight: geometry.size.height)
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
