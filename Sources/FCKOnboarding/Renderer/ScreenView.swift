@@ -78,48 +78,17 @@ struct ProgressBar: View {
 #if DEBUG
 struct ScreenView_Previews: PreviewProvider {
     static var previews: some View {
-        ScreenView(
-            screen: FlowScreen(
-                id: "1",
-                type: .informational,
-                showProgressBar: true,
-                root: .stack(StackElement(
-                    id: "root",
-                    axis: "vertical",
-                    spacing: 16,
-                    distribution: nil,
-                    alignItems: nil,
-                    backgroundColor: nil,
-                    padding: nil,
-                    margin: nil,
-                    width: nil,
-                    height: nil,
-                    borderRadius: nil,
-                    borderColor: nil,
-                    borderWidth: nil,
-                    tapBehaviors: nil,
-                    children: [
-                        .text(TextElement(
-                            id: "text1",
-                            content: "Welcome to the app!",
-                            fontSize: 24,
-                            color: "#000000",
-                            alignment: "center",
-                            fontWeight: "bold",
-                            padding: nil,
-                            margin: nil,
-                            width: nil,
-                            height: nil,
-                            tapBehaviors: nil
-                        ))
-                    ]
-                ))
-            ),
-            screenIndex: 0,
-            totalScreens: 3,
-            onNext: {},
-            onSkip: {}
-        )
+        // Preview requires decoding from JSON due to custom decoders
+        // Simple placeholder view instead
+        VStack {
+            Text("ScreenView Preview")
+                .font(.headline)
+            Text("Load actual flow data to preview")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.gray.opacity(0.1))
     }
 }
 #endif
