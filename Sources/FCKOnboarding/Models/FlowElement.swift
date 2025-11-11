@@ -227,12 +227,31 @@ public struct StackElement: FlowElementProtocol {
     public let tapBehaviors: [TapBehavior]?
     public let children: [FlowElement]
 
-    // Custom decoder to handle both old and new format
     enum CodingKeys: String, CodingKey {
         case id, type, axis, spacing, distribution, alignItems
         case backgroundColor, padding, margin, width, height
         case borderRadius, borderColor, borderWidth
         case tapBehaviors, children
+    }
+
+    // Custom decoder to auto-generate ID if missing
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.axis = try container.decode(String.self, forKey: .axis)
+        self.spacing = try? container.decode(Double.self, forKey: .spacing)
+        self.distribution = try? container.decode(String.self, forKey: .distribution)
+        self.alignItems = try? container.decode(String.self, forKey: .alignItems)
+        self.backgroundColor = try? container.decode(String.self, forKey: .backgroundColor)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+        self.borderRadius = try? container.decode(Double.self, forKey: .borderRadius)
+        self.borderColor = try? container.decode(String.self, forKey: .borderColor)
+        self.borderWidth = try? container.decode(Double.self, forKey: .borderWidth)
+        self.tapBehaviors = try? container.decode([TapBehavior].self, forKey: .tapBehaviors)
+        self.children = (try? container.decode([FlowElement].self, forKey: .children)) ?? []
     }
 }
 
@@ -251,6 +270,26 @@ public struct TextElement: FlowElementProtocol {
     public let width: Dimension?
     public let height: Dimension?
     public let tapBehaviors: [TapBehavior]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, content, fontSize, color, alignment, fontWeight
+        case padding, margin, width, height, tapBehaviors
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.content = try container.decode(String.self, forKey: .content)
+        self.fontSize = try? container.decode(Double.self, forKey: .fontSize)
+        self.color = try? container.decode(String.self, forKey: .color)
+        self.alignment = try? container.decode(String.self, forKey: .alignment)
+        self.fontWeight = try? container.decode(String.self, forKey: .fontWeight)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+        self.tapBehaviors = try? container.decode([TapBehavior].self, forKey: .tapBehaviors)
+    }
 }
 
 // MARK: - Image Element (UPDATED)
@@ -267,6 +306,25 @@ public struct ImageElement: FlowElementProtocol {
     public let padding: Spacing?
     public let margin: Spacing?
     public let tapBehaviors: [TapBehavior]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, url, alt, width, height, objectFit
+        case borderRadius, padding, margin, tapBehaviors
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.url = try container.decode(String.self, forKey: .url)
+        self.alt = try? container.decode(String.self, forKey: .alt)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+        self.objectFit = try? container.decode(String.self, forKey: .objectFit)
+        self.borderRadius = try? container.decode(Double.self, forKey: .borderRadius)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.tapBehaviors = try? container.decode([TapBehavior].self, forKey: .tapBehaviors)
+    }
 }
 
 // MARK: - Button Element (UPDATED)
@@ -285,7 +343,29 @@ public struct ButtonElement: FlowElementProtocol {
     public let height: Dimension?
     public let borderRadius: Double?
     public let tapBehaviors: [TapBehavior]?
-    public let children: [FlowElement]? // Buttons can have child elements (like text)
+    public let children: [FlowElement]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, text, action, style, backgroundColor, textColor
+        case padding, margin, width, height, borderRadius, tapBehaviors, children
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.text = try? container.decode(String.self, forKey: .text)
+        self.action = try? container.decode(String.self, forKey: .action)
+        self.style = try? container.decode(String.self, forKey: .style)
+        self.backgroundColor = try? container.decode(String.self, forKey: .backgroundColor)
+        self.textColor = try? container.decode(String.self, forKey: .textColor)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+        self.borderRadius = try? container.decode(Double.self, forKey: .borderRadius)
+        self.tapBehaviors = try? container.decode([TapBehavior].self, forKey: .tapBehaviors)
+        self.children = try? container.decode([FlowElement].self, forKey: .children)
+    }
 }
 
 // MARK: - Input Element
@@ -303,6 +383,26 @@ public struct InputElement: FlowElementProtocol {
     public let width: Dimension?
     public let height: Dimension?
     public let tapBehaviors: [TapBehavior]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, placeholder, label, inputType, required, variableKey
+        case padding, margin, width, height, tapBehaviors
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.placeholder = try? container.decode(String.self, forKey: .placeholder)
+        self.label = try? container.decode(String.self, forKey: .label)
+        self.inputType = try? container.decode(String.self, forKey: .inputType)
+        self.required = try? container.decode(Bool.self, forKey: .required)
+        self.variableKey = try? container.decode(String.self, forKey: .variableKey)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+        self.tapBehaviors = try? container.decode([TapBehavior].self, forKey: .tapBehaviors)
+    }
 }
 
 // MARK: - DatePicker Element
@@ -317,6 +417,23 @@ public struct DatePickerElement: FlowElementProtocol {
     public let margin: Spacing?
     public let width: Dimension?
     public let height: Dimension?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, label, mode, variableKey
+        case padding, margin, width, height
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.label = try? container.decode(String.self, forKey: .label)
+        self.mode = try? container.decode(String.self, forKey: .mode)
+        self.variableKey = try? container.decode(String.self, forKey: .variableKey)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+    }
 }
 
 // MARK: - Options Element (NEW - Matches Builder)
@@ -341,6 +458,40 @@ public struct OptionsElement: FlowElementProtocol {
         public let label: String
         public let value: String
         public let icon: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, label, value, icon
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+            self.label = try container.decode(String.self, forKey: .label)
+            self.value = try container.decode(String.self, forKey: .value)
+            self.icon = try? container.decode(String.self, forKey: .icon)
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, options, multiple, selectedTextColor
+        case optionBorderRadius, optionBackgroundColor, selectedBackgroundColor
+        case variableKey, padding, margin, width, height
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.options = (try? container.decode([Option].self, forKey: .options)) ?? []
+        self.multiple = try? container.decode(Bool.self, forKey: .multiple)
+        self.selectedTextColor = try? container.decode(String.self, forKey: .selectedTextColor)
+        self.optionBorderRadius = try? container.decode(Double.self, forKey: .optionBorderRadius)
+        self.optionBackgroundColor = try? container.decode(String.self, forKey: .optionBackgroundColor)
+        self.selectedBackgroundColor = try? container.decode(String.self, forKey: .selectedBackgroundColor)
+        self.variableKey = try? container.decode(String.self, forKey: .variableKey)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
     }
 }
 
@@ -356,5 +507,22 @@ public struct ProgressBarElement: FlowElementProtocol {
     public let margin: Spacing?
     public let width: Dimension?
     public let height: Dimension?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, progress, barColor, trackColor
+        case padding, margin, width, height
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.progress = (try? container.decode(Double.self, forKey: .progress)) ?? 0.0
+        self.barColor = try? container.decode(String.self, forKey: .barColor)
+        self.trackColor = try? container.decode(String.self, forKey: .trackColor)
+        self.padding = try? container.decode(Spacing.self, forKey: .padding)
+        self.margin = try? container.decode(Spacing.self, forKey: .margin)
+        self.width = try? container.decode(Dimension.self, forKey: .width)
+        self.height = try? container.decode(Dimension.self, forKey: .height)
+    }
 }
 
