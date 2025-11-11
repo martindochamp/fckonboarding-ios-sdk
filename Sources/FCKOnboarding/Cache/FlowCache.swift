@@ -10,8 +10,13 @@ public class FlowCache {
         self.userDefaults = userDefaults
     }
 
-    /// Save flow to cache
+    /// Save flow to cache (disabled on simulator)
     public func saveFlow(_ flow: FlowResponse) throws {
+        #if targetEnvironment(simulator)
+        // Don't cache on simulator - always fetch fresh
+        print("🔧 [FCKOnboarding] Simulator detected - Flow cache disabled")
+        return
+        #else
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
@@ -19,10 +24,15 @@ public class FlowCache {
         userDefaults.set(data, forKey: cacheKey)
         userDefaults.set(flow.version, forKey: versionKey)
         userDefaults.synchronize()
+        #endif
     }
 
-    /// Load cached flow
+    /// Load cached flow (always returns nil on simulator)
     public func loadFlow() throws -> FlowResponse? {
+        #if targetEnvironment(simulator)
+        // Don't return cached data on simulator - always fetch fresh
+        return nil
+        #else
         guard let data = userDefaults.data(forKey: cacheKey) else {
             return nil
         }
@@ -31,12 +41,18 @@ public class FlowCache {
         decoder.dateDecodingStrategy = .iso8601
 
         return try decoder.decode(FlowResponse.self, from: data)
+        #endif
     }
 
-    /// Get cached flow version
+    /// Get cached flow version (always returns nil on simulator)
     public func getCachedVersion() -> Int? {
+        #if targetEnvironment(simulator)
+        // No cached version on simulator
+        return nil
+        #else
         let version = userDefaults.integer(forKey: versionKey)
         return version > 0 ? version : nil
+        #endif
     }
 
     /// Clear cached flow

@@ -42,7 +42,15 @@ public class FCKAPIClient {
         self.debugMode = debugMode
         self.environment = FCKEnvironment.current
 
-        // Configure URLSession with caching
+        // Configure URLSession - disable caching on simulator for development
+        #if targetEnvironment(simulator)
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        if debugMode {
+            print("🔧 [FCKOnboarding] Running on SIMULATOR - All caching disabled")
+        }
+        #else
         let config = URLSessionConfiguration.default
         config.requestCachePolicy = .returnCacheDataElseLoad
         config.urlCache = URLCache(
@@ -50,6 +58,11 @@ public class FCKAPIClient {
             diskCapacity: 50 * 1024 * 1024,     // 50 MB
             diskPath: "FCKOnboardingCache"
         )
+        if debugMode {
+            print("📱 [FCKOnboarding] Running on DEVICE - Caching enabled")
+        }
+        #endif
+
         self.session = URLSession(configuration: config)
 
         if debugMode {

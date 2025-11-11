@@ -250,20 +250,38 @@ struct ImageElementView: View {
             return
         }
 
+        #if targetEnvironment(simulator)
+        print("🔧 [FCKOnboarding] Simulator: Loading image with no cache from: \(url)")
+        #else
         print("🖼️ [FCKOnboarding] Loading image from: \(url)")
+        #endif
 
         do {
-            // Create URLRequest with cache policy to always fetch fresh
+            // Create URLRequest with cache policy
             var request = URLRequest(url: url)
-            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
-            // Create session configuration with no cache
+            // On simulator: always fetch fresh, on device: use cache
+            #if targetEnvironment(simulator)
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
             let config = URLSessionConfiguration.ephemeral
             config.urlCache = nil
             config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            #else
+            request.cachePolicy = .returnCacheDataElseLoad
+            let config = URLSessionConfiguration.default
+            #endif
+
             let session = URLSession(configuration: config)
 
-            let (data, _) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
+
+            // Log response info for debugging
+            if let httpResponse = response as? HTTPURLResponse {
+                print("   Response status: \(httpResponse.statusCode)")
+                print("   Content-Type: \(httpResponse.allHeaderFields["Content-Type"] ?? "unknown")")
+                print("   Data size: \(data.count) bytes")
+            }
+
             if let uiImage = UIImage(data: data) {
                 print("✅ [FCKOnboarding] Successfully loaded image: \(url.lastPathComponent), size: \(uiImage.size)")
                 await MainActor.run {
@@ -271,14 +289,26 @@ struct ImageElementView: View {
                     self.isLoading = false
                 }
             } else {
-                print("⚠️ [FCKOnboarding] Failed to decode image data from URL: \(url)")
+                print("❌ [FCKOnboarding] Failed to decode image data from URL: \(url)")
+                print("   Data size: \(data.count) bytes")
+                print("   First 100 bytes: \(data.prefix(100).map { String(format: "%02x", $0) }.joined())")
+
+                // Check if data looks like HTML (common error response)
+                if let dataString = String(data: data, encoding: .utf8), dataString.contains("<!DOCTYPE") || dataString.contains("<html") {
+                    print("   ⚠️ Response appears to be HTML, not an image!")
+                    print("   HTML preview: \(dataString.prefix(200))")
+                }
+
                 await MainActor.run {
                     self.isLoading = false
                 }
             }
         } catch {
-            print("⚠️ [FCKOnboarding] Network error loading image from URL: \(url)")
+            print("❌ [FCKOnboarding] Network error loading image from URL: \(url)")
             print("   Error: \(error.localizedDescription)")
+            if let urlError = error as? URLError {
+                print("   URLError code: \(urlError.code.rawValue)")
+            }
             await MainActor.run {
                 self.isLoading = false
             }
