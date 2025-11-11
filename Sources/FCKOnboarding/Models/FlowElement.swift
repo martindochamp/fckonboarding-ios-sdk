@@ -7,7 +7,7 @@ public protocol FlowElementProtocol: Codable, Equatable, Identifiable {
 }
 
 /// Type-erased wrapper for flow elements - matches builder output
-public enum FlowElement: Codable, Equatable, Identifiable {
+public enum FlowElement: Codable, Identifiable {
     case stack(StackElement)
     case text(TextElement)
     case image(ImageElement)
@@ -16,7 +16,7 @@ public enum FlowElement: Codable, Equatable, Identifiable {
     case datePicker(DatePickerElement)
     case options(OptionsElement) // NEW: Matches builder "options" type
     case progressbar(ProgressBarElement) // NEW: Matches builder "progressbar" type
-    case unknown([String: Any]) // Fallback for new element types
+    case unknown(String) // Fallback for new element types - store just the type name
 
     public var id: String {
         switch self {
@@ -28,7 +28,23 @@ public enum FlowElement: Codable, Equatable, Identifiable {
         case .datePicker(let el): return el.id
         case .options(let el): return el.id
         case .progressbar(let el): return el.id
-        case .unknown(let dict): return dict["id"] as? String ?? UUID().uuidString
+        case .unknown: return UUID().uuidString
+        }
+    }
+
+    // Manual Equatable conformance
+    public static func == (lhs: FlowElement, rhs: FlowElement) -> Bool {
+        switch (lhs, rhs) {
+        case (.stack(let l), .stack(let r)): return l == r
+        case (.text(let l), .text(let r)): return l == r
+        case (.image(let l), .image(let r)): return l == r
+        case (.button(let l), .button(let r)): return l == r
+        case (.input(let l), .input(let r)): return l == r
+        case (.datePicker(let l), .datePicker(let r)): return l == r
+        case (.options(let l), .options(let r)): return l == r
+        case (.progressbar(let l), .progressbar(let r)): return l == r
+        case (.unknown(let l), .unknown(let r)): return l == r
+        default: return false
         }
     }
 
@@ -54,15 +70,8 @@ public enum FlowElement: Codable, Equatable, Identifiable {
         case "progressbar": // NEW: Handle progressbar from builder
             self = .progressbar(try ProgressBarElement(from: decoder))
         default:
-            // Handle unknown types gracefully
-            if let dict = try? decoder.singleValueContainer().decode([String: Any].self) {
-                self = .unknown(dict)
-            } else {
-                throw DecodingError.dataCorrupted(
-                    DecodingError.Context(codingPath: decoder.codingPath,
-                                        debugDescription: "Unknown element type: \(type)")
-                )
-            }
+            // Handle unknown types gracefully - just store the type name
+            self = .unknown(type)
         }
     }
 
@@ -76,9 +85,9 @@ public enum FlowElement: Codable, Equatable, Identifiable {
         case .datePicker(let el): try el.encode(to: encoder)
         case .options(let el): try el.encode(to: encoder)
         case .progressbar(let el): try el.encode(to: encoder)
-        case .unknown(let dict):
-            var container = encoder.singleValueContainer()
-            try container.encode(dict)
+        case .unknown(let typeName):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(typeName, forKey: .type)
         }
     }
 

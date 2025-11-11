@@ -79,32 +79,37 @@ public struct OnboardingFlowView: View {
     }
 
     @ViewBuilder
-    private func flowContent(flow: FlowResponse) -> some View {
-        ZStack {
-            TabView(selection: $currentScreenIndex) {
-                ForEach(Array(flow.config.screens.enumerated()), id: \.element.id) { index, screen in
-                    ScreenView(
-                        screen: screen,
-                        screenIndex: index,
-                        totalScreens: flow.config.screens.count,
-                        onNext: {
-                            if index < flow.config.screens.count - 1 {
-                                withAnimation {
-                                    currentScreenIndex = index + 1
+    private func flowContent(flow: PlacementFlowResponse) -> some View {
+        if let config = flow.config {
+            ZStack {
+                TabView(selection: $currentScreenIndex) {
+                    ForEach(Array(config.screens.enumerated()), id: \.element.id) { index, screen in
+                        ScreenView(
+                            screen: screen,
+                            screenIndex: index,
+                            totalScreens: config.screens.count,
+                            onNext: {
+                                if index < config.screens.count - 1 {
+                                    withAnimation {
+                                        currentScreenIndex = index + 1
+                                    }
+                                } else {
+                                    completeFlow()
                                 }
-                            } else {
-                                completeFlow()
+                            },
+                            onSkip: {
+                                skipFlow()
                             }
-                        },
-                        onSkip: {
-                            skipFlow()
-                        }
-                    )
-                    .tag(index)
+                        )
+                        .tag(index)
+                    }
                 }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .ignoresSafeArea()
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea()
+        } else {
+            Text("No flow configuration available")
+                .foregroundColor(.secondary)
         }
     }
 
@@ -161,7 +166,7 @@ class OnboardingFlowViewModel: ObservableObject {
 
     enum LoadingState {
         case loading
-        case loaded(FlowResponse)
+        case loaded(PlacementFlowResponse)
         case error(Error)
     }
 
@@ -169,11 +174,20 @@ class OnboardingFlowViewModel: ObservableObject {
         state = .loading
 
         do {
-            let flow = try await FCKOnboarding.shared.fetchFlow()
-            state = .loaded(flow)
+            guard let response = try await FCKOnboarding.shared.fetchFlow() else {
+                // No flow available (user completed or in holdout)
+                state = .error(NSError(domain: "FCKOnboarding", code: 404, userInfo: [
+                    NSLocalizedDescriptionKey: "No onboarding flow available"
+                ]))
+                return
+            }
+
+            state = .loaded(response)
 
             // Track view event
-            try? await FCKOnboarding.shared.trackEvent(name: "flow_viewed", flowId: flow.flowId)
+            if let flowId = response.flowId {
+                try? await FCKOnboarding.shared.trackEvent(name: "flow_viewed", flowId: flowId)
+            }
         } catch {
             state = .error(error)
         }
