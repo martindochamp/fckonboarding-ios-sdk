@@ -29,14 +29,12 @@ struct ScreenView: View {
                 // Screen content - centered in remaining space
                 GeometryReader { geometry in
                     ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(screen.elements) { element in
-                                ElementRenderer.render(
-                                    element: element,
-                                    onNavigate: handleTapBehavior
-                                )
-                            }
-                        }
+                        // Render the root element directly (not just children)
+                        // The root contains padding/margin that should be applied
+                        ElementRenderer.render(
+                            element: screen.root,
+                            onNavigate: handleTapBehavior
+                        )
                         .frame(minHeight: geometry.size.height)
                         .frame(maxWidth: .infinity)
                     }

@@ -74,27 +74,6 @@ struct StackElementView: View {
                 .applyDimensions(width: element.width, height: element.height)
                 .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
         }
-        .onAppear {
-            print("📐 [Stack \(element.id)] Rendered")
-            if let padding = element.padding {
-                print("   Padding - top: \(padding.top.toDouble()), right: \(padding.right.toDouble()), bottom: \(padding.bottom.toDouble()), left: \(padding.left.toDouble())")
-            } else {
-                print("   Padding - none")
-            }
-            if let margin = element.margin {
-                print("   Margin - top: \(margin.top.toDouble()), right: \(margin.right.toDouble()), bottom: \(margin.bottom.toDouble()), left: \(margin.left.toDouble())")
-            } else {
-                print("   Margin - none")
-            }
-            if let tapBehaviors = element.tapBehaviors {
-                print("   👆 Has \(tapBehaviors.count) tap behavior(s)")
-                for behavior in tapBehaviors {
-                    print("      - \(behavior.type)\(behavior.targetScreenId.map { " → \($0)" } ?? "")")
-                }
-            } else {
-                print("   No tap behaviors")
-            }
-        }
         .contentShape(Rectangle()) // Make entire stack tappable
         .onTapGesture {
             // Only handle tap if this stack has tap behaviors
@@ -856,15 +835,6 @@ extension View {
         let marginBottom = CGFloat(margin?.bottom.toDouble() ?? 0)
         let marginLeft = CGFloat(margin?.left.toDouble() ?? 0)
 
-        #if DEBUG
-        if paddingTop > 0 || paddingRight > 0 || paddingBottom > 0 || paddingLeft > 0 {
-            print("      🎨 Applying padding: top=\(paddingTop), right=\(paddingRight), bottom=\(paddingBottom), left=\(paddingLeft)")
-        }
-        if marginTop > 0 || marginRight > 0 || marginBottom > 0 || marginLeft > 0 {
-            print("      🎨 Applying margin: top=\(marginTop), right=\(marginRight), bottom=\(marginBottom), left=\(marginLeft)")
-        }
-        #endif
-
         return self
             // Apply padding first (inside the element)
             .padding(.top, paddingTop)
@@ -876,7 +846,6 @@ extension View {
             .padding(.trailing, marginRight)
             .padding(.bottom, marginBottom)
             .padding(.leading, marginLeft)
-            .background(Color.red.opacity(0.1)) // Visual indicator that padding is applied
     }
 
     func applyDimensions(width: Dimension?, height: Dimension?) -> some View {
