@@ -557,35 +557,24 @@ struct OptionsElementView: View {
                     }
                 }) {
                     HStack(spacing: 12) {
-                        if let icon = option.icon {
-                            Image(systemName: icon)
-                                .font(.title2)
-                                .foregroundColor(selectedOptions.contains(option.id) ?
-                                               Color(hex: element.selectedTextColor ?? "#000000") :
-                                               Color(hex: element.optionTextColor ?? "#000000"))
-                        }
-
                         Text(option.label)
                             .font(.body)
-                            .foregroundColor(selectedOptions.contains(option.id) ?
-                                           Color(hex: element.selectedTextColor ?? "#000000") :
-                                           Color(hex: element.optionTextColor ?? "#000000"))
 
                         Spacer()
 
                         if selectedOptions.contains(option.id) {
-                            Image(systemName: element.multiple == true ? "checkmark.square.fill" : "checkmark.circle.fill")
-                                .foregroundColor(Color(hex: element.selectedTextColor ?? "#007AFF"))
-                        } else {
-                            Image(systemName: element.multiple == true ? "square" : "circle")
-                                .foregroundColor(.gray)
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
                         }
                     }
                     .padding()
+                    .foregroundColor(selectedOptions.contains(option.id) ?
+                                   Color(hex: element.selectedTextColor ?? "#FFFFFF") :
+                                   Color(hex: element.optionTextColor ?? "#000000"))
                     .background(
                         RoundedRectangle(cornerRadius: element.optionBorderRadius ?? 12)
                             .fill(selectedOptions.contains(option.id) ?
-                                  Color(hex: element.selectedBackgroundColor ?? "#007AFF").opacity(0.1) :
+                                  Color(hex: element.selectedBackgroundColor ?? "#4CAF50") :
                                   Color(hex: element.optionBackgroundColor ?? "#F5F5F5"))
                     )
                 }
