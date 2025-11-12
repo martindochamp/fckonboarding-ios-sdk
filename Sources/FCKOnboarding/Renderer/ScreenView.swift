@@ -93,7 +93,12 @@ struct ScreenView: View {
                 // Go back (same as skip for now)
                 print("      → Going back")
                 onSkip()
+            } else if behavior.isComplete {
+                // Mark flow as complete
+                print("      → Completing flow")
+                onNext() // This will complete the flow
             }
+            // Note: Haptics, bump, and opacity are handled in the view itself
         }
     }
 }

@@ -154,8 +154,9 @@ public struct TapBehavior: Codable, Equatable {
     public let targetScreenId: String?
     public let intensity: String? // For haptics
     public let scale: Double? // For bump animation
-    public let duration: Double? // For bump animation
+    public let duration: Double? // For bump/opacity animation
     public let delay: Double? // Delay before navigation
+    public let targetOpacity: Double? // For opacity animation
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -164,6 +165,7 @@ public struct TapBehavior: Codable, Equatable {
         case scale
         case duration
         case delay
+        case targetOpacity
     }
 
     /// Check if this is a navigation behavior
@@ -174,6 +176,26 @@ public struct TapBehavior: Codable, Equatable {
     /// Check if this is a back navigation behavior
     public var isBack: Bool {
         return type == "back"
+    }
+
+    /// Check if this is a complete behavior
+    public var isComplete: Bool {
+        return type == "complete"
+    }
+
+    /// Check if this is a haptics behavior
+    public var isHaptics: Bool {
+        return type == "haptics"
+    }
+
+    /// Check if this is a bump behavior
+    public var isBump: Bool {
+        return type == "bump"
+    }
+
+    /// Check if this is an opacity behavior
+    public var isOpacity: Bool {
+        return type == "opacity"
     }
 }
 

@@ -44,6 +44,9 @@ struct StackElementView: View {
     let element: StackElement
     let onNavigate: (FlowElement) -> Void
 
+    @State private var scale: CGFloat = 1.0
+    @State private var opacity: Double = 1.0
+
     var body: some View {
         let isVertical = element.axis.lowercased() == "vertical"
         let stack = Group {
@@ -74,16 +77,86 @@ struct StackElementView: View {
                 .applyDimensions(width: element.width, height: element.height)
                 .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
         }
+        .scaleEffect(scale)
+        .opacity(opacity)
         .contentShape(Rectangle()) // Make entire stack tappable
         .onTapGesture {
             // Only handle tap if this stack has tap behaviors
             if let tapBehaviors = element.tapBehaviors, !tapBehaviors.isEmpty {
                 print("🔔 [Stack \(element.id)] Tapped (has tap behaviors)")
+
+                // Apply visual effects from tap behaviors
+                applyTapEffects(tapBehaviors)
+
+                // Trigger navigation/action
                 onNavigate(.stack(element))
             } else {
                 print("🔔 [Stack \(element.id)] Tapped (no tap behaviors - ignoring)")
             }
         }
+    }
+
+    private func applyTapEffects(_ behaviors: [TapBehavior]) {
+        // Find bump and opacity behaviors
+        let bumpBehavior = behaviors.first(where: { $0.isBump })
+        let opacityBehavior = behaviors.first(where: { $0.isOpacity })
+
+        // Apply bump effect
+        if let bump = bumpBehavior {
+            let targetScale = bump.scale ?? 0.95
+            let duration = (bump.duration ?? 150) / 1000.0 // Convert ms to seconds
+
+            withAnimation(.easeInOut(duration: duration)) {
+                scale = targetScale
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                withAnimation(.easeInOut(duration: duration)) {
+                    scale = 1.0
+                }
+            }
+        }
+
+        // Apply opacity effect
+        if let opacityEffect = opacityBehavior {
+            let targetOpacity = opacityEffect.targetOpacity ?? 0.7
+            let duration = (opacityEffect.duration ?? 150) / 1000.0 // Convert ms to seconds
+
+            withAnimation(.easeInOut(duration: duration)) {
+                opacity = targetOpacity
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                withAnimation(.easeInOut(duration: duration)) {
+                    opacity = 1.0
+                }
+            }
+        }
+
+        // Apply haptics
+        let hapticBehavior = behaviors.first(where: { $0.isHaptics })
+        if let haptic = hapticBehavior {
+            applyHapticFeedback(intensity: haptic.intensity ?? "light")
+        }
+    }
+
+    private func applyHapticFeedback(intensity: String) {
+        #if os(iOS)
+        switch intensity.lowercased() {
+        case "light":
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        case "medium":
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        case "heavy":
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
+        default:
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        }
+        #endif
     }
 
     @ViewBuilder
