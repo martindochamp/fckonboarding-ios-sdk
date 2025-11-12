@@ -232,13 +232,23 @@ struct TextElementView: View {
     let element: TextElement
 
     var body: some View {
-        Text(element.content)
-            .font(.system(size: element.fontSize ?? 16, weight: fontWeight))
-            .foregroundColor(Color(hex: element.color ?? "#000000"))
-            .multilineTextAlignment(textAlignment)
-            .frame(maxWidth: .infinity, alignment: frameAlignment)
-            .applySpacing(padding: element.padding, margin: element.margin)
-            .applyDimensions(width: element.width, height: element.height)
+        Group {
+            // Only apply maxWidth: .infinity if width is 'fill', not 'auto'
+            if let width = element.width, case .fill = width {
+                Text(element.content)
+                    .font(.system(size: element.fontSize ?? 16, weight: fontWeight))
+                    .foregroundColor(Color(hex: element.color ?? "#000000"))
+                    .multilineTextAlignment(textAlignment)
+                    .frame(maxWidth: .infinity, alignment: frameAlignment)
+            } else {
+                Text(element.content)
+                    .font(.system(size: element.fontSize ?? 16, weight: fontWeight))
+                    .foregroundColor(Color(hex: element.color ?? "#000000"))
+                    .multilineTextAlignment(textAlignment)
+            }
+        }
+        .applySpacing(padding: element.padding, margin: element.margin)
+        .applyDimensions(width: element.width, height: element.height)
     }
 
     private var fontWeight: Font.Weight {
