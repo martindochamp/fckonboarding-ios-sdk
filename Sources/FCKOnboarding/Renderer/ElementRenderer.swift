@@ -856,6 +856,15 @@ extension View {
         let marginBottom = CGFloat(margin?.bottom.toDouble() ?? 0)
         let marginLeft = CGFloat(margin?.left.toDouble() ?? 0)
 
+        #if DEBUG
+        if paddingTop > 0 || paddingRight > 0 || paddingBottom > 0 || paddingLeft > 0 {
+            print("      🎨 Applying padding: top=\(paddingTop), right=\(paddingRight), bottom=\(paddingBottom), left=\(paddingLeft)")
+        }
+        if marginTop > 0 || marginRight > 0 || marginBottom > 0 || marginLeft > 0 {
+            print("      🎨 Applying margin: top=\(marginTop), right=\(marginRight), bottom=\(marginBottom), left=\(marginLeft)")
+        }
+        #endif
+
         return self
             // Apply padding first (inside the element)
             .padding(.top, paddingTop)
@@ -867,6 +876,7 @@ extension View {
             .padding(.trailing, marginRight)
             .padding(.bottom, marginBottom)
             .padding(.leading, marginLeft)
+            .background(Color.red.opacity(0.1)) // Visual indicator that padding is applied
     }
 
     func applyDimensions(width: Dimension?, height: Dimension?) -> some View {
