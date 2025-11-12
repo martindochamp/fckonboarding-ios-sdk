@@ -604,10 +604,10 @@ struct ProgressBarElementView: View {
                     .fill(Color(hex: element.trackColor ?? "#E5E5E5"))
                     .frame(height: geometry.size.height)
 
-                // Progress
+                // Progress (convert 0-100 scale to 0-1 scale)
                 Rectangle()
                     .fill(Color(hex: element.barColor ?? "#007AFF"))
-                    .frame(width: geometry.size.width * CGFloat(element.progress), height: geometry.size.height)
+                    .frame(width: geometry.size.width * CGFloat(element.progress / 100.0), height: geometry.size.height)
                     .animation(.easeInOut, value: element.progress)
             }
         }

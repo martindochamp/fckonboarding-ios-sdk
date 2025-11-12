@@ -16,17 +16,8 @@ struct ScreenView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Progress bar
-                if screen.showProgress {
-                    ProgressBar(
-                        current: screenIndex + 1,
-                        total: totalScreens
-                    )
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                }
-
                 // Screen content - centered in remaining space
+                // Note: Progress bars are now part of the flow content itself
                 GeometryReader { geometry in
                     ScrollView {
                         // Render the root element directly (not just children)
