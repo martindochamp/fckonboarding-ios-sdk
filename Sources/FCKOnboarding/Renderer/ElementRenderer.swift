@@ -4,41 +4,36 @@ import SwiftUI
 enum ElementRenderer {
     @ViewBuilder
     static func render(element: FlowElement, onNavigate: @escaping (FlowElement) -> Void) -> some View {
-        Group {
-            switch element {
-            case .stack(let el):
-                StackElementView(element: el, onNavigate: onNavigate)
-            case .text(let el):
-                TextElementView(element: el)
-            case .image(let el):
-                ImageElementView(element: el)
-            case .button(let el):
-                ButtonElementView(element: el, onNavigate: onNavigate)
-            case .input(let el):
-                InputElementView(element: el)
-            case .email(let el):
-                EmailInputElementView(element: el)
-            case .phone(let el):
-                PhoneInputElementView(element: el)
-            case .number(let el):
-                NumberInputElementView(element: el)
-            case .toggle(let el):
-                ToggleElementView(element: el)
-            case .datePicker(let el):
-                DatePickerElementView(element: el)
-            case .choice(let el):
-                ChoiceElementView(element: el)
-            case .options(let el):
-                OptionsElementView(element: el)
-            case .progressbar(let el):
-                ProgressBarElementView(element: el)
-            case .unknown:
-                EmptyView() // Silently skip unknown elements
-            }
-        }
-        .contentShape(Rectangle()) // Make entire area tappable
-        .onTapGesture {
-            onNavigate(element)
+        // Render element WITHOUT global tap gesture (stacks/buttons handle their own taps)
+        switch element {
+        case .stack(let el):
+            StackElementView(element: el, onNavigate: onNavigate)
+        case .text(let el):
+            TextElementView(element: el)
+        case .image(let el):
+            ImageElementView(element: el)
+        case .button(let el):
+            ButtonElementView(element: el, onNavigate: onNavigate)
+        case .input(let el):
+            InputElementView(element: el)
+        case .email(let el):
+            EmailInputElementView(element: el)
+        case .phone(let el):
+            PhoneInputElementView(element: el)
+        case .number(let el):
+            NumberInputElementView(element: el)
+        case .toggle(let el):
+            ToggleElementView(element: el)
+        case .datePicker(let el):
+            DatePickerElementView(element: el)
+        case .choice(let el):
+            ChoiceElementView(element: el)
+        case .options(let el):
+            OptionsElementView(element: el)
+        case .progressbar(let el):
+            ProgressBarElementView(element: el)
+        case .unknown:
+            EmptyView() // Silently skip unknown elements
         }
     }
 }
@@ -71,23 +66,45 @@ struct StackElementView: View {
             }
         }
 
-        stack
-            .frame(maxWidth: isVertical ? .infinity : nil)
-            .applySpacing(padding: element.padding, margin: element.margin)
-            .background(element.backgroundColor.flatMap { Color(hex: $0) })
-            .applyDimensions(width: element.width, height: element.height)
-            .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
-            .onAppear {
-                if let padding = element.padding {
-                    print("📐 [Stack \(element.id)] Padding - top: \(padding.top.toDouble()), right: \(padding.right.toDouble()), bottom: \(padding.bottom.toDouble()), left: \(padding.left.toDouble())")
-                }
-                if let margin = element.margin {
-                    print("📐 [Stack \(element.id)] Margin - top: \(margin.top.toDouble()), right: \(margin.right.toDouble()), bottom: \(margin.bottom.toDouble()), left: \(margin.left.toDouble())")
-                }
-                if let tapBehaviors = element.tapBehaviors {
-                    print("👆 [Stack \(element.id)] Has \(tapBehaviors.count) tap behavior(s)")
-                }
+        Group {
+            stack
+                .frame(maxWidth: isVertical ? .infinity : nil)
+                .applySpacing(padding: element.padding, margin: element.margin)
+                .background(element.backgroundColor.flatMap { Color(hex: $0) })
+                .applyDimensions(width: element.width, height: element.height)
+                .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
+        }
+        .onAppear {
+            print("📐 [Stack \(element.id)] Rendered")
+            if let padding = element.padding {
+                print("   Padding - top: \(padding.top.toDouble()), right: \(padding.right.toDouble()), bottom: \(padding.bottom.toDouble()), left: \(padding.left.toDouble())")
+            } else {
+                print("   Padding - none")
             }
+            if let margin = element.margin {
+                print("   Margin - top: \(margin.top.toDouble()), right: \(margin.right.toDouble()), bottom: \(margin.bottom.toDouble()), left: \(margin.left.toDouble())")
+            } else {
+                print("   Margin - none")
+            }
+            if let tapBehaviors = element.tapBehaviors {
+                print("   👆 Has \(tapBehaviors.count) tap behavior(s)")
+                for behavior in tapBehaviors {
+                    print("      - \(behavior.type)\(behavior.targetScreenId.map { " → \($0)" } ?? "")")
+                }
+            } else {
+                print("   No tap behaviors")
+            }
+        }
+        .contentShape(Rectangle()) // Make entire stack tappable
+        .onTapGesture {
+            // Only handle tap if this stack has tap behaviors
+            if let tapBehaviors = element.tapBehaviors, !tapBehaviors.isEmpty {
+                print("🔔 [Stack \(element.id)] Tapped (has tap behaviors)")
+                onNavigate(.stack(element))
+            } else {
+                print("🔔 [Stack \(element.id)] Tapped (no tap behaviors - ignoring)")
+            }
+        }
     }
 
     @ViewBuilder
@@ -829,17 +846,27 @@ struct ChoiceElementView: View {
 
 extension View {
     func applySpacing(padding: Spacing?, margin: Spacing?) -> some View {
-        self
+        let paddingTop = CGFloat(padding?.top.toDouble() ?? 0)
+        let paddingRight = CGFloat(padding?.right.toDouble() ?? 0)
+        let paddingBottom = CGFloat(padding?.bottom.toDouble() ?? 0)
+        let paddingLeft = CGFloat(padding?.left.toDouble() ?? 0)
+
+        let marginTop = CGFloat(margin?.top.toDouble() ?? 0)
+        let marginRight = CGFloat(margin?.right.toDouble() ?? 0)
+        let marginBottom = CGFloat(margin?.bottom.toDouble() ?? 0)
+        let marginLeft = CGFloat(margin?.left.toDouble() ?? 0)
+
+        return self
             // Apply padding first (inside the element)
-            .padding(.top, CGFloat(padding?.top.toDouble() ?? 0))
-            .padding(.trailing, CGFloat(padding?.right.toDouble() ?? 0))
-            .padding(.bottom, CGFloat(padding?.bottom.toDouble() ?? 0))
-            .padding(.leading, CGFloat(padding?.left.toDouble() ?? 0))
+            .padding(.top, paddingTop)
+            .padding(.trailing, paddingRight)
+            .padding(.bottom, paddingBottom)
+            .padding(.leading, paddingLeft)
             // Then apply margin as additional padding (outside the element)
-            .padding(.top, CGFloat(margin?.top.toDouble() ?? 0))
-            .padding(.trailing, CGFloat(margin?.right.toDouble() ?? 0))
-            .padding(.bottom, CGFloat(margin?.bottom.toDouble() ?? 0))
-            .padding(.leading, CGFloat(margin?.left.toDouble() ?? 0))
+            .padding(.top, marginTop)
+            .padding(.trailing, marginRight)
+            .padding(.bottom, marginBottom)
+            .padding(.leading, marginLeft)
     }
 
     func applyDimensions(width: Dimension?, height: Dimension?) -> some View {
