@@ -658,7 +658,8 @@ public struct OptionsElement: FlowElementProtocol {
     public let type: String = "options"
     public let options: [Option]
     public let multiple: Bool?
-    public let selectedTextColor: String?
+    public let optionTextColor: String? // Text color for unselected options
+    public let selectedTextColor: String? // Text color for selected options
     public let optionBorderRadius: Double?
     public let optionBackgroundColor: String?
     public let selectedBackgroundColor: String?
@@ -688,7 +689,7 @@ public struct OptionsElement: FlowElementProtocol {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, type, options, multiple, selectedTextColor
+        case id, type, options, multiple, optionTextColor, selectedTextColor
         case optionBorderRadius, optionBackgroundColor, selectedBackgroundColor
         case variableKey, padding, margin, width, height
     }
@@ -698,6 +699,7 @@ public struct OptionsElement: FlowElementProtocol {
         self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
         self.options = (try? container.decode([Option].self, forKey: .options)) ?? []
         self.multiple = try? container.decode(Bool.self, forKey: .multiple)
+        self.optionTextColor = try? container.decode(String.self, forKey: .optionTextColor)
         self.selectedTextColor = try? container.decode(String.self, forKey: .selectedTextColor)
         self.optionBorderRadius = try? container.decode(Double.self, forKey: .optionBorderRadius)
         self.optionBackgroundColor = try? container.decode(String.self, forKey: .optionBackgroundColor)

@@ -560,10 +560,16 @@ struct OptionsElementView: View {
                         if let icon = option.icon {
                             Image(systemName: icon)
                                 .font(.title2)
+                                .foregroundColor(selectedOptions.contains(option.id) ?
+                                               Color(hex: element.selectedTextColor ?? "#000000") :
+                                               Color(hex: element.optionTextColor ?? "#000000"))
                         }
 
                         Text(option.label)
                             .font(.body)
+                            .foregroundColor(selectedOptions.contains(option.id) ?
+                                           Color(hex: element.selectedTextColor ?? "#000000") :
+                                           Color(hex: element.optionTextColor ?? "#000000"))
 
                         Spacer()
 
