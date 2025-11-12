@@ -435,11 +435,16 @@ public struct StackElement: FlowElementProtocol {
     public let tapBehaviors: [TapBehavior]?
     public let children: [FlowElement]
 
+    // iOS Glass Effect (iOS 15+)
+    public let useGlassEffect: Bool?
+    public let glassEffectStyle: String? // "ultraThin", "thin", "regular", "thick", "ultraThick"
+
     enum CodingKeys: String, CodingKey {
         case id, type, axis, spacing, distribution, alignItems
         case backgroundColor, padding, margin, width, height
         case borderRadius, borderColor, borderWidth
         case tapBehaviors, children
+        case useGlassEffect, glassEffectStyle
     }
 
     // Custom decoder to auto-generate ID if missing
@@ -460,6 +465,8 @@ public struct StackElement: FlowElementProtocol {
         self.borderWidth = try? container.decode(Double.self, forKey: .borderWidth)
         self.tapBehaviors = try? container.decode([TapBehavior].self, forKey: .tapBehaviors)
         self.children = (try? container.decode([FlowElement].self, forKey: .children)) ?? []
+        self.useGlassEffect = try? container.decode(Bool.self, forKey: .useGlassEffect)
+        self.glassEffectStyle = try? container.decode(String.self, forKey: .glassEffectStyle)
     }
 }
 

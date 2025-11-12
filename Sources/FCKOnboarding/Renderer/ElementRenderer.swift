@@ -44,12 +44,12 @@ struct StackElementView: View {
     let element: StackElement
     let onNavigate: (FlowElement) -> Void
 
-    @State private var scale: CGFloat = 1.0
-    @State private var opacity: Double = 1.0
-
     var body: some View {
         let isVertical = element.axis.lowercased() == "vertical"
-        let stack = Group {
+        let hasTapBehaviors = element.tapBehaviors != nil && !(element.tapBehaviors?.isEmpty ?? true)
+
+        // Build the stack content
+        let stackContent = Group {
             if isVertical {
                 VStack(alignment: horizontalAlignment, spacing: element.spacing ?? 0) {
                     applyDistribution(vertical: true) {
@@ -69,95 +69,29 @@ struct StackElementView: View {
             }
         }
 
-        Group {
-            stack
-                .frame(maxWidth: isVertical ? .infinity : nil)
-                .applySpacing(padding: element.padding, margin: element.margin)
-                .background(element.backgroundColor.flatMap { Color(hex: $0) })
-                .applyDimensions(width: element.width, height: element.height)
-                .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
-        }
-        .scaleEffect(scale)
-        .opacity(opacity)
-        .contentShape(Rectangle()) // Make entire stack tappable
-        .onTapGesture {
-            // Only handle tap if this stack has tap behaviors
-            if let tapBehaviors = element.tapBehaviors, !tapBehaviors.isEmpty {
-                print("🔔 [Stack \(element.id)] Tapped (has tap behaviors)")
+        // Apply styling to stack
+        let styledStack = stackContent
+            .frame(maxWidth: isVertical ? .infinity : nil)
+            .applySpacing(padding: element.padding, margin: element.margin)
+            .applyGlassEffect(useGlass: element.useGlassEffect == true, style: element.glassEffectStyle)
+            .background(element.backgroundColor.flatMap { Color(hex: $0) })
+            .applyDimensions(width: element.width, height: element.height)
+            .applyBorder(radius: element.borderRadius, color: element.borderColor, width: element.borderWidth)
 
-                // Apply visual effects from tap behaviors
-                applyTapEffects(tapBehaviors)
-
-                // Trigger navigation/action
+        // If has tap behaviors, wrap in Button for native press handling
+        if hasTapBehaviors {
+            Button(action: {
+                print("🔔 [Stack \(element.id)] Button tapped")
                 onNavigate(.stack(element))
-            } else {
-                print("🔔 [Stack \(element.id)] Tapped (no tap behaviors - ignoring)")
+            }) {
+                styledStack
             }
+            .buttonStyle(TapBehaviorButtonStyle(behaviors: element.tapBehaviors ?? []))
+        } else {
+            styledStack
         }
     }
 
-    private func applyTapEffects(_ behaviors: [TapBehavior]) {
-        // Find bump and opacity behaviors
-        let bumpBehavior = behaviors.first(where: { $0.isBump })
-        let opacityBehavior = behaviors.first(where: { $0.isOpacity })
-
-        // Apply bump effect
-        if let bump = bumpBehavior {
-            let targetScale = bump.scale ?? 0.95
-            let duration = (bump.duration ?? 150) / 1000.0 // Convert ms to seconds
-
-            withAnimation(.easeInOut(duration: duration)) {
-                scale = targetScale
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                withAnimation(.easeInOut(duration: duration)) {
-                    scale = 1.0
-                }
-            }
-        }
-
-        // Apply opacity effect
-        if let opacityEffect = opacityBehavior {
-            let targetOpacity = opacityEffect.targetOpacity ?? 0.7
-            let duration = (opacityEffect.duration ?? 150) / 1000.0 // Convert ms to seconds
-
-            withAnimation(.easeInOut(duration: duration)) {
-                opacity = targetOpacity
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                withAnimation(.easeInOut(duration: duration)) {
-                    opacity = 1.0
-                }
-            }
-        }
-
-        // Apply haptics
-        let hapticBehavior = behaviors.first(where: { $0.isHaptics })
-        if let haptic = hapticBehavior {
-            applyHapticFeedback(intensity: haptic.intensity ?? "light")
-        }
-    }
-
-    private func applyHapticFeedback(intensity: String) {
-        #if os(iOS)
-        switch intensity.lowercased() {
-        case "light":
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-        case "medium":
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-        case "heavy":
-            let generator = UIImpactFeedbackGenerator(style: .heavy)
-            generator.impactOccurred()
-        default:
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-        }
-        #endif
-    }
 
     @ViewBuilder
     private func applyDistribution<Content: View>(vertical: Bool, @ViewBuilder content: () -> Content) -> some View {
@@ -223,6 +157,52 @@ struct StackElementView: View {
         case "flex-start", "start", "top": return .top
         default: return .center
         }
+    }
+}
+
+// MARK: - Tap Behavior Button Style
+
+/// Custom ButtonStyle that applies tap behaviors (opacity, bump, haptics) during press
+struct TapBehaviorButtonStyle: ButtonStyle {
+    let behaviors: [TapBehavior]
+
+    func makeBody(configuration: Configuration) -> some View {
+        let bumpBehavior = behaviors.first(where: { $0.isBump })
+        let opacityBehavior = behaviors.first(where: { $0.isOpacity })
+        let hapticBehavior = behaviors.first(where: { $0.isHaptics })
+
+        let targetScale = bumpBehavior?.scale ?? 0.95
+        let targetOpacity = opacityBehavior?.targetOpacity ?? 0.7
+
+        configuration.label
+            .scaleEffect(configuration.isPressed ? targetScale : 1.0)
+            .opacity(configuration.isPressed ? targetOpacity : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { newValue in
+                // Trigger haptic feedback when pressed
+                if newValue, let haptic = hapticBehavior {
+                    applyHapticFeedback(intensity: haptic.intensity ?? "light")
+                }
+            }
+    }
+
+    private func applyHapticFeedback(intensity: String) {
+        #if os(iOS)
+        switch intensity.lowercased() {
+        case "light":
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        case "medium":
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        case "heavy":
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
+        default:
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        }
+        #endif
     }
 }
 
@@ -905,6 +885,62 @@ struct ChoiceElementView: View {
 }
 
 // MARK: - Helper Extensions
+
+// MARK: - Glass Effect View Modifier
+
+extension View {
+    func applyGlassEffect(useGlass: Bool, style: String?) -> some View {
+        Group {
+            if useGlass {
+                #if os(iOS)
+                if #available(iOS 15.0, *) {
+                    let material: Material = {
+                        switch style?.lowercased() {
+                        case "ultrathin":
+                            return .ultraThinMaterial
+                        case "thin":
+                            return .thinMaterial
+                        case "thick":
+                            return .thickMaterial
+                        case "ultrathick":
+                            return .ultraThickMaterial
+                        default: // "regular" or nil
+                            return .regularMaterial
+                        }
+                    }()
+                    self.background(material)
+                } else {
+                    // Fallback for older iOS versions - use translucent background
+                    self.background(Color.white.opacity(0.3))
+                }
+                #else
+                // macOS or other platforms
+                if #available(macOS 12.0, *) {
+                    let material: Material = {
+                        switch style?.lowercased() {
+                        case "ultrathin":
+                            return .ultraThinMaterial
+                        case "thin":
+                            return .thinMaterial
+                        case "thick":
+                            return .thickMaterial
+                        case "ultrathick":
+                            return .ultraThickMaterial
+                        default:
+                            return .regularMaterial
+                        }
+                    }()
+                    self.background(material)
+                } else {
+                    self.background(Color.white.opacity(0.3))
+                }
+                #endif
+            } else {
+                self
+            }
+        }
+    }
+}
 
 extension View {
     func applySpacing(padding: Spacing?, margin: Spacing?) -> some View {
